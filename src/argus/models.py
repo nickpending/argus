@@ -1,1 +1,102 @@
 """Pydantic models for events and configuration."""
+
+from pathlib import Path
+from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator
+
+
+class ServerConfig(BaseModel):
+    """Server configuration.
+
+    Security note: Default host 0.0.0.0 binds to all interfaces for local network access.
+    This is intentional for the observability use case, protected by API key authentication.
+    For localhost-only access, set host to "127.0.0.1" in config.
+    """
+
+    host: str = Field(default="127.0.0.1", description="Bind address")
+    port: int = Field(default=8765, ge=1, le=65535, description="Server port")
+    api_keys: list[str] = Field(..., min_length=1, description="Valid API keys for auth")
+
+    @field_validator("api_keys")
+    @classmethod
+    def validate_api_keys_unique(cls, v: list[str]) -> list[str]:
+        """Ensure API keys are unique."""
+        if len(v) != len(set(v)):
+            raise ValueError("API keys must be unique")
+        return v
+
+
+class DatabaseConfig(BaseModel):
+    """Database configuration."""
+
+    path: str = Field(default="~/.local/share/argus/events.db", description="SQLite database path")
+    journal_mode: Literal["WAL", "DELETE", "TRUNCATE", "PERSIST", "MEMORY", "OFF"] = Field(
+        default="WAL", description="SQLite journal mode"
+    )
+
+    @field_validator("path")
+    @classmethod
+    def expand_path(cls, v: str) -> str:
+        """Expand and normalize path, resolving symlinks."""
+        # Expand tilde and resolve to absolute path
+        expanded = Path(v).expanduser().resolve()
+        return str(expanded)
+
+
+class RetentionConfig(BaseModel):
+    """Event retention configuration."""
+
+    retention_days: int = Field(default=30, ge=1, description="Delete events older than N days")
+    cleanup_time: str = Field(default="03:00", description="When to run cleanup (HH:MM)")
+    vacuum_after_cleanup: bool = Field(default=True, description="Run VACUUM after cleanup")
+
+    @field_validator("cleanup_time")
+    @classmethod
+    def validate_cleanup_time_format(cls, v: str) -> str:
+        """Validate cleanup_time format is HH:MM."""
+        parts = v.split(":")
+        if len(parts) != 2:
+            raise ValueError("cleanup_time must be in HH:MM format")
+        try:
+            hour, minute = int(parts[0]), int(parts[1])
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                raise ValueError("Invalid time values")
+        except ValueError as e:
+            raise ValueError("cleanup_time must be valid 24-hour time (HH:MM)") from e
+        return v
+
+
+class LimitsConfig(BaseModel):
+    """Request limits configuration."""
+
+    max_event_size_kb: int = Field(default=512, gt=0, description="Max event size in KB")
+    max_batch_size: int = Field(default=100, ge=1, description="Max events per batch POST")
+
+
+class WebUIConfig(BaseModel):
+    """Web UI configuration."""
+
+    enabled: bool = Field(default=True, description="Serve web UI")
+    static_path: str | None = Field(default=None, description="Custom UI files path")
+
+
+class LoggingConfig(BaseModel):
+    """Logging configuration."""
+
+    level: Literal["debug", "info", "warn", "error"] = Field(
+        default="info", description="Log level"
+    )
+    format: Literal["json", "text"] = Field(default="json", description="Log format")
+    output: str = Field(default="stdout", description="Log destination")
+
+
+class Config(BaseModel):
+    """Root configuration model."""
+
+    server: ServerConfig
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    retention: RetentionConfig = Field(default_factory=RetentionConfig)
+    limits: LimitsConfig = Field(default_factory=LimitsConfig)
+    web_ui: WebUIConfig = Field(default_factory=WebUIConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
