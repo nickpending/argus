@@ -1,7 +1,7 @@
 """Pydantic models for events and configuration."""
 
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -100,3 +100,44 @@ class Config(BaseModel):
     limits: LimitsConfig = Field(default_factory=LimitsConfig)
     web_ui: WebUIConfig = Field(default_factory=WebUIConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
+
+
+# Event models
+
+
+class EventCreate(BaseModel):
+    """Event creation model for POST input.
+
+    Accepts events from observability producers (Sable, Prismis, etc).
+    Timestamp auto-generated if not provided.
+    """
+
+    source: str = Field(..., min_length=1, description="Producing application identifier")
+    event_type: str = Field(..., min_length=1, description="Event category")
+    timestamp: str | None = Field(default=None, description="ISO8601 timestamp (UTC with Z suffix)")
+    message: str | None = Field(default=None, description="Human-readable description")
+    level: str | None = Field(default=None, description="Log level (debug/info/warn/error)")
+    data: dict[str, Any] | None = Field(default=None, description="Arbitrary JSON data")
+
+    @field_validator("source", "event_type")
+    @classmethod
+    def validate_non_empty(cls, v: str) -> str:
+        """Ensure source and event_type are non-empty."""
+        if not v or not v.strip():
+            raise ValueError("Field must not be empty")
+        return v.strip()
+
+
+class Event(BaseModel):
+    """Event model for database output.
+
+    Includes server-generated fields (id, timestamp).
+    """
+
+    id: int = Field(..., description="Database-generated event ID")
+    source: str = Field(..., description="Producing application identifier")
+    event_type: str = Field(..., description="Event category")
+    timestamp: str = Field(..., description="ISO8601 timestamp (UTC with Z suffix)")
+    message: str | None = Field(default=None, description="Human-readable description")
+    level: str | None = Field(default=None, description="Log level")
+    data: dict[str, Any] | None = Field(default=None, description="Arbitrary JSON data")
