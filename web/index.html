@@ -4,23 +4,122 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Argus - Event Observability</title>
-    <style>
-        body {
-            font-family: monospace;
-            background: #0a0a0f;
-            color: #00e5ff;
-            padding: 2rem;
-            margin: 0;
-        }
-        h1 {
-            border-bottom: 2px solid #00e5ff;
-            padding-bottom: 0.5rem;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Argus Event Observability</h1>
-    <p>Static file serving operational.</p>
-    <p>Web UI implementation: Task 8.1-8.5</p>
+    <!-- Fixed Header -->
+    <header class="argus-header">
+        <h1 class="logo">
+            <span class="logo-icon">◉</span>
+            ARGUS
+        </h1>
+        <div class="header-controls">
+            <div class="scroll-controls">
+                <label>
+                    <input type="checkbox" id="auto-scroll">
+                    Auto-scroll
+                </label>
+            </div>
+            <button class="filter-toggle" id="filter-toggle">Filters</button>
+            <button class="export-btn" id="export-btn">Export CSV</button>
+            <div class="status-indicator">
+                <span class="status-dot disconnected" id="status-dot"></span>
+                <span id="status-text">Disconnected</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container with Grid Background -->
+    <main class="main-container">
+        <!-- Events Table -->
+        <div class="table-wrapper">
+            <table class="events-table">
+                <thead>
+                    <tr>
+                        <th class="col-time">Time</th>
+                        <th class="col-source">Source</th>
+                        <th class="col-type">Event Type</th>
+                        <th class="col-level">Lvl</th>
+                        <th class="col-message">Message</th>
+                    </tr>
+                </thead>
+                <tbody id="events-body">
+                    <!-- Event rows will be inserted here by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Detail Panel (Hidden by default) -->
+        <div class="detail-panel" id="detail-panel">
+            <div class="detail-header">
+                <h2>Event #<span id="detail-id">—</span></h2>
+                <button class="close-btn" id="detail-close">×</button>
+            </div>
+
+            <div class="detail-content">
+                <dl class="detail-fields">
+                    <dt>Source</dt>
+                    <dd id="detail-source">—</dd>
+
+                    <dt>Event Type</dt>
+                    <dd id="detail-type">—</dd>
+
+                    <dt>Timestamp</dt>
+                    <dd id="detail-timestamp">—</dd>
+
+                    <dt>Level</dt>
+                    <dd id="detail-level">—</dd>
+
+                    <dt>Message</dt>
+                    <dd id="detail-message">—</dd>
+                </dl>
+
+                <div class="detail-data">
+                    <h3>Data</h3>
+                    <pre id="detail-data-json">{}</pre>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Filter Panel (Hidden by default, slides in from right) -->
+    <aside class="filter-panel" id="filter-panel">
+        <h2>Filters</h2>
+
+        <div class="filter-group">
+            <label for="filter-source">Source</label>
+            <select id="filter-source">
+                <option value="">All Sources</option>
+                <!-- Options populated dynamically from /sources endpoint -->
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="filter-type">Event Type</label>
+            <input type="text" id="filter-type" placeholder="thinking, tool_use, ...">
+        </div>
+
+        <div class="filter-group">
+            <label>Level</label>
+            <div class="level-chips">
+                <button class="chip" data-level="debug">Debug</button>
+                <button class="chip active" data-level="info">Info</button>
+                <button class="chip active" data-level="warn">Warn</button>
+                <button class="chip active" data-level="error">Error</button>
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <label for="filter-search">Search Message</label>
+            <input type="text" id="filter-search" placeholder="Search in messages...">
+        </div>
+
+        <div class="filter-actions">
+            <button class="apply-btn" id="filter-apply">Apply</button>
+            <button class="clear-btn" id="filter-clear">Clear All</button>
+        </div>
+    </aside>
+
+    <script src="app.js"></script>
 </body>
 </html>
