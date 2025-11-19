@@ -44,10 +44,16 @@ select = [
     "B",   # flake8-bugbear
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
+    "S",   # flake8-bandit security
 ]
 ignore = [
     "E501",  # line too long (handled by formatter)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S603", "S607"]
+"test_*.py" = ["S101", "S603", "S607"]
+"**/test_*.py" = ["S101", "S603", "S607"]
 
 [tool.mypy]
 python_version = "3.11"
@@ -55,6 +61,10 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disable_error_code = ["import-untyped", "misc"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
