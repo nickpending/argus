@@ -3,45 +3,10 @@
 INVARIANT PROTECTION: API security, event durability, ID uniqueness
 """
 
-from pathlib import Path
-
-import pytest
 from fastapi.testclient import TestClient
 
 from argus.database import Database
-from argus.models import Config, DatabaseConfig, ServerConfig
-from argus.server import app
-
-
-@pytest.fixture
-def test_config(tmp_path: Path) -> Config:
-    """Create test configuration with temporary database."""
-    db_path = tmp_path / "test_events.db"
-    return Config(
-        database=DatabaseConfig(path=str(db_path)),
-        server=ServerConfig(
-            host="127.0.0.1",
-            port=8765,
-            api_keys=["test-key-1", "test-key-2"],
-        ),
-    )
-
-
-@pytest.fixture
-def client(test_config: Config) -> TestClient:
-    """Create test client with temporary database."""
-    # Initialize database
-    db = Database(test_config.database.path)
-
-    # Override app state
-    app.state.config = test_config
-    app.state.db = db
-    app.state.ws_manager = None  # Not needed for these tests
-
-    yield TestClient(app)
-
-    # Cleanup
-    db.close()
+from argus.models import Config
 
 
 def test_api_key_blocks_unauthenticated(client: TestClient) -> None:
