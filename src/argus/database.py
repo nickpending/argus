@@ -176,6 +176,26 @@ class Database:
 
         return events
 
+    def get_sources(self) -> list[str]:
+        """Get list of distinct sources from events.
+
+        Returns:
+            Sorted list of unique source strings
+        """
+        cursor = self.conn.execute("SELECT DISTINCT source FROM events ORDER BY source")
+        rows = cursor.fetchall()
+        return [str(row[0]) for row in rows]
+
+    def get_event_types(self) -> list[str]:
+        """Get list of distinct event types from events.
+
+        Returns:
+            Sorted list of unique event_type strings
+        """
+        cursor = self.conn.execute("SELECT DISTINCT event_type FROM events ORDER BY event_type")
+        rows = cursor.fetchall()
+        return [str(row[0]) for row in rows]
+
     def close(self) -> None:
         """Close database connection."""
         self.conn.close()

@@ -136,6 +136,131 @@ async def create_event(
     return {"status": "captured", "event_id": event_id}
 
 
+# GET /events endpoint - Query historical events with filtering
+@app.get("/events")
+async def query_events(
+    request: Request,
+    x_api_key: str = Header(..., description="API key for authentication"),
+    source: str | None = None,
+    event_type: str | None = None,
+    level: str | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """Query events with optional filtering.
+
+    Args:
+        request: FastAPI request for app.state access
+        x_api_key: API key from X-API-Key header
+        source: Filter by source
+        event_type: Filter by event type
+        level: Filter by level
+        since: Filter events after this timestamp (ISO8601)
+        until: Filter events before this timestamp (ISO8601)
+        limit: Maximum number of events to return (default 100, max 1000)
+
+    Returns:
+        JSON response with events list
+
+    Raises:
+        HTTPException: 401 if API key invalid, 400 if limit exceeds max
+    """
+    # Validate API key
+    config = request.app.state.config
+    if x_api_key not in config.server.api_keys:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+
+    # Enforce max limit of 1000
+    if limit > 1000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Limit cannot exceed 1000",
+        )
+
+    # Query database with filters
+    db = request.app.state.db
+    events = db.query_events(
+        source=source,
+        event_type=event_type,
+        level=level,
+        since=since,
+        until=until,
+        limit=limit,
+    )
+
+    return {"events": events}
+
+
+# GET /sources endpoint - Discovery endpoint for available sources
+@app.get("/sources")
+async def get_sources(
+    request: Request,
+    x_api_key: str = Header(..., description="API key for authentication"),
+) -> dict[str, Any]:
+    """Get list of distinct sources from events.
+
+    Args:
+        request: FastAPI request for app.state access
+        x_api_key: API key from X-API-Key header
+
+    Returns:
+        JSON response with sources list
+
+    Raises:
+        HTTPException: 401 if API key invalid
+    """
+    # Validate API key
+    config = request.app.state.config
+    if x_api_key not in config.server.api_keys:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+
+    # Get distinct sources from database
+    db = request.app.state.db
+    sources = db.get_sources()
+
+    return {"sources": sources}
+
+
+# GET /event-types endpoint - Discovery endpoint for available event types
+@app.get("/event-types")
+async def get_event_types(
+    request: Request,
+    x_api_key: str = Header(..., description="API key for authentication"),
+) -> dict[str, Any]:
+    """Get list of distinct event types from events.
+
+    Args:
+        request: FastAPI request for app.state access
+        x_api_key: API key from X-API-Key header
+
+    Returns:
+        JSON response with event_types list
+
+    Raises:
+        HTTPException: 401 if API key invalid
+    """
+    # Validate API key
+    config = request.app.state.config
+    if x_api_key not in config.server.api_keys:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+
+    # Get distinct event types from database
+    db = request.app.state.db
+    event_types = db.get_event_types()
+
+    return {"event_types": event_types}
+
+
 # WebSocket /ws endpoint - Real-time event streaming with auth and filtering
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
