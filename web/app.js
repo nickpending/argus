@@ -3,7 +3,7 @@
 
 // Configuration
 const CONFIG = {
-  wsUrl: "ws://localhost:8765/ws",
+  wsUrl: `ws://${window.location.host}/ws`,
   apiKey: "test-key-123", // TODO: Load from server config endpoint (task 9.3)
   reconnect: {
     initialDelay: 5000, // 5 seconds
@@ -29,6 +29,7 @@ const elements = {};
 document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   initializeEventListeners();
+  loadSourceOptions();
   connect();
 });
 
@@ -47,6 +48,15 @@ function cacheElements() {
   elements.detailLevel = document.getElementById("detail-level");
   elements.detailMessage = document.getElementById("detail-message");
   elements.detailDataJson = document.getElementById("detail-data-json");
+  // Filter panel elements
+  elements.filterPanel = document.getElementById("filter-panel");
+  elements.filterToggle = document.getElementById("filter-toggle");
+  elements.filterSource = document.getElementById("filter-source");
+  elements.filterType = document.getElementById("filter-type");
+  elements.filterSearch = document.getElementById("filter-search");
+  elements.filterApply = document.getElementById("filter-apply");
+  elements.filterClear = document.getElementById("filter-clear");
+  elements.levelChips = document.querySelectorAll(".level-chips .chip");
 }
 
 // Initialize event listeners
@@ -54,6 +64,30 @@ function initializeEventListeners() {
   // Detail panel close button
   elements.detailClose.addEventListener("click", () => {
     elements.detailPanel.classList.remove("open");
+  });
+
+  // Filter panel toggle button
+  elements.filterToggle.addEventListener("click", () => {
+    elements.filterPanel.classList.toggle("open");
+  });
+
+  // Level chip toggle buttons (auto-apply on click)
+  elements.levelChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("active");
+      // Auto-apply filters when chip toggled
+      applyFilters();
+    });
+  });
+
+  // Filter apply button
+  elements.filterApply.addEventListener("click", () => {
+    applyFilters();
+  });
+
+  // Filter clear button
+  elements.filterClear.addEventListener("click", () => {
+    clearFilters();
   });
 }
 
@@ -202,10 +236,10 @@ function renderEvent(event) {
   // Format timestamp
   const timestamp = formatTimestamp(event.timestamp);
 
-  // Format level badge
-  const levelBadge = event.level
-    ? `<span class="level-badge ${event.level}">${event.level}</span>`
-    : '<span class="level-badge debug">-</span>';
+  // Format level badge (null level = debug)
+  const level = event.level || "debug";
+  const levelText = event.level || "-";
+  const levelBadge = `<span class="level-badge ${level}">${levelText}</span>`;
 
   // Truncate message for table display
   const message = event.message || "-";
@@ -225,11 +259,17 @@ function renderEvent(event) {
     showEventDetail(event);
   });
 
+  // Check if row matches current filters
+  const matchesFilter = rowMatchesFilter(row, state.currentFilters);
+  if (!matchesFilter) {
+    row.style.display = "none";
+  }
+
   // Insert at top of table (newest first)
   elements.eventsBody.insertBefore(row, elements.eventsBody.firstChild);
 
-  // Auto-scroll if enabled
-  if (elements.autoScroll.checked) {
+  // Auto-scroll if enabled (only for visible rows)
+  if (elements.autoScroll.checked && matchesFilter) {
     row.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 }
@@ -306,4 +346,171 @@ function scheduleReconnect() {
       CONFIG.reconnect.maxDelay,
     );
   }, state.reconnectDelay);
+}
+
+// Collect current filter values
+function collectFilters() {
+  const filters = {};
+
+  // Source filter (dropdown)
+  const source = elements.filterSource.value.trim();
+  if (source) {
+    filters.source = source;
+  }
+
+  // Event type filter (comma-separated text input)
+  const eventType = elements.filterType.value.trim();
+  if (eventType) {
+    filters.event_type = eventType;
+  }
+
+  // Level filter (active chips = visible levels)
+  const activeLevels = Array.from(elements.levelChips)
+    .filter((chip) => chip.classList.contains("active"))
+    .map((chip) => chip.dataset.level);
+
+  // Always apply level filter
+  // If all active (4 chips), omit filter = show all
+  // If some active, filter to those levels
+  // If none active, empty array = hide all
+  if (activeLevels.length < 4) {
+    filters.levels = activeLevels;
+  }
+
+  // Search filter (message contains text)
+  const search = elements.filterSearch.value.trim();
+  if (search) {
+    filters.search = search;
+  }
+
+  return filters;
+}
+
+// Apply current filters (CLIENT-SIDE - show/hide rows)
+function applyFilters() {
+  const filters = collectFilters();
+
+  // Store current filters for newly arriving events
+  state.currentFilters = filters;
+
+  // Filter existing table rows
+  filterTableRows(filters);
+}
+
+// Clear all filters
+function clearFilters() {
+  // Reset source dropdown
+  elements.filterSource.value = "";
+
+  // Reset event type input
+  elements.filterType.value = "";
+
+  // Reset search input
+  elements.filterSearch.value = "";
+
+  // Activate all level chips (show all levels)
+  elements.levelChips.forEach((chip) => {
+    chip.classList.add("active");
+  });
+
+  // Clear stored filters
+  state.currentFilters = {};
+
+  // Show all rows
+  filterTableRows({});
+}
+
+// Filter table rows client-side (show/hide based on criteria)
+function filterTableRows(filters) {
+  const rows = elements.eventsBody.querySelectorAll(".event-row");
+
+  rows.forEach((row) => {
+    const matchesFilter = rowMatchesFilter(row, filters);
+    row.style.display = matchesFilter ? "" : "none";
+  });
+}
+
+// Check if row matches filter criteria
+function rowMatchesFilter(row, filters) {
+  // No filters = show all
+  if (Object.keys(filters).length === 0) {
+    return true;
+  }
+
+  // Extract row data from DOM
+  const sourceCell = row.querySelector(".source .source-badge");
+  const typeCell = row.querySelector(".type");
+  const levelCell = row.querySelector(".level .level-badge");
+  const messageCell = row.querySelector(".message");
+
+  const rowData = {
+    source: sourceCell ? sourceCell.textContent.trim() : "",
+    event_type: typeCell ? typeCell.textContent.trim() : "",
+    level: levelCell ? levelCell.textContent.trim() : "",
+    message: messageCell ? messageCell.textContent.trim() : "",
+  };
+
+  // Check source filter
+  if (filters.source && rowData.source !== filters.source) {
+    return false;
+  }
+
+  // Check event_type filter
+  if (filters.event_type && rowData.event_type !== filters.event_type) {
+    return false;
+  }
+
+  // Check level filter (OR logic - show if matches ANY active level)
+  if (filters.levels !== undefined) {
+    // If empty array, hide all (no levels selected)
+    if (filters.levels.length === 0) {
+      return false;
+    }
+    // Events with no level show as "-" in badge, treat as debug level
+    const eventLevel = rowData.level === "-" ? "debug" : rowData.level;
+    if (!filters.levels.includes(eventLevel)) {
+      return false;
+    }
+  }
+
+  // Check search filter (message contains text)
+  if (filters.search) {
+    const searchLower = filters.search.toLowerCase();
+    if (!rowData.message.toLowerCase().includes(searchLower)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Load source options from API
+async function loadSourceOptions() {
+  try {
+    const response = await fetch("/sources", {
+      headers: {
+        "X-API-Key": CONFIG.apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      console.error("Failed to load sources:", response.status);
+      return;
+    }
+
+    const data = await response.json();
+    const sources = data.sources || [];
+
+    // Populate dropdown
+    sources.forEach((source) => {
+      const option = document.createElement("option");
+      option.value = source;
+      option.textContent = source;
+      elements.filterSource.appendChild(option);
+    });
+
+    console.log(`Loaded ${sources.length} sources for filter dropdown`);
+  } catch (error) {
+    console.error("Error loading sources:", error);
+  }
 }
