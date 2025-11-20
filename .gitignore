@@ -85,6 +85,9 @@ ehthumbs.db
 .claude/
 .claudex/
 
+# Playwright MCP
+.playwright-mcp/
+
 # Data and backups
 data/
 backups/
