@@ -196,6 +196,37 @@ class Database:
         rows = cursor.fetchall()
         return [str(row[0]) for row in rows]
 
+    def cleanup_old_events(self, retention_days: int, vacuum: bool = False) -> int:
+        """Delete events older than retention threshold.
+
+        Args:
+            retention_days: Delete events older than N days
+            vacuum: Run VACUUM after cleanup to reclaim disk space
+
+        Returns:
+            Number of events deleted
+        """
+        from datetime import timedelta
+
+        # Calculate cutoff timestamp (events older than this will be deleted)
+        cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+        cutoff_iso = cutoff.isoformat().replace("+00:00", "Z")
+
+        # Delete old events with parameterized query
+        with self.conn:
+            cursor = self.conn.execute(
+                "DELETE FROM events WHERE timestamp < ?",
+                (cutoff_iso,),
+            )
+            deleted_count = cursor.rowcount
+
+        # Optionally run VACUUM to reclaim disk space
+        # Note: VACUUM cannot run inside a transaction, so execute separately
+        if vacuum and deleted_count > 0:
+            self.conn.execute("VACUUM")
+
+        return deleted_count
+
     def close(self) -> None:
         """Close database connection."""
         self.conn.close()

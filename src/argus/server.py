@@ -2,7 +2,7 @@
 
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +23,46 @@ from argus.models import EventCreate
 from argus.websocket import WebSocketManager
 
 
+async def cleanup_task(
+    db: Database, retention_days: int, cleanup_time_str: str, vacuum: bool
+) -> None:
+    """Background task to cleanup old events daily at scheduled time.
+
+    Args:
+        db: Database instance
+        retention_days: Delete events older than N days
+        cleanup_time_str: Time to run cleanup (HH:MM format)
+        vacuum: Run VACUUM after cleanup
+    """
+    # Parse cleanup time (HH:MM)
+    hour, minute = map(int, cleanup_time_str.split(":"))
+    cleanup_time_obj = time(hour, minute)
+
+    while True:
+        # Calculate next cleanup time
+        now = datetime.now(UTC)
+        today_cleanup = datetime.combine(now.date(), cleanup_time_obj, tzinfo=UTC)
+
+        if now >= today_cleanup:
+            # Today's cleanup time has passed, schedule for tomorrow
+            next_cleanup = today_cleanup + timedelta(days=1)
+        else:
+            # Today's cleanup time hasn't happened yet
+            next_cleanup = today_cleanup
+
+        # Sleep until cleanup time
+        sleep_seconds = (next_cleanup - now).total_seconds()
+        await asyncio.sleep(sleep_seconds)
+
+        # Run cleanup
+        try:
+            deleted = db.cleanup_old_events(retention_days, vacuum)
+            print(f"Cleanup completed: deleted {deleted} events (retention={retention_days} days)")
+        except Exception as e:
+            # Log error but don't crash the task
+            print(f"Cleanup error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
     """Manage application lifecycle - startup and shutdown."""
@@ -36,14 +76,32 @@ async def lifespan(app: FastAPI) -> Any:
     # Initialize WebSocket manager
     ws_manager = WebSocketManager()
 
+    # Launch cleanup task in background
+    cleanup_task_handle = asyncio.create_task(
+        cleanup_task(
+            db=db,
+            retention_days=config.retention.retention_days,
+            cleanup_time_str=config.retention.cleanup_time,
+            vacuum=config.retention.vacuum_after_cleanup,
+        )
+    )
+
     # Store in app state for endpoint access
     app.state.config = config
     app.state.db = db
     app.state.ws_manager = ws_manager
+    app.state.cleanup_task = cleanup_task_handle
 
     yield  # Application runs here
 
     # SHUTDOWN PHASE
+    # Cancel cleanup task gracefully
+    cleanup_task_handle.cancel()
+    try:
+        await cleanup_task_handle
+    except asyncio.CancelledError:
+        pass  # Expected when cancelling
+
     db.close()
 
 
