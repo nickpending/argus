@@ -1,6 +1,7 @@
 """FastAPI server and endpoints."""
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
@@ -21,6 +22,9 @@ from argus.config import load_config
 from argus.database import Database
 from argus.models import EventCreate
 from argus.websocket import WebSocketManager
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 async def cleanup_task(
@@ -57,10 +61,12 @@ async def cleanup_task(
         # Run cleanup
         try:
             deleted = db.cleanup_old_events(retention_days, vacuum)
-            print(f"Cleanup completed: deleted {deleted} events (retention={retention_days} days)")
+            logger.info(
+                "Cleanup completed: deleted %d events (retention=%d days)", deleted, retention_days
+            )
         except Exception as e:
             # Log error but don't crash the task
-            print(f"Cleanup error: {e}")
+            logger.error("Cleanup error: %s", e, exc_info=True)
 
 
 @asynccontextmanager
@@ -198,7 +204,9 @@ async def create_event(
 @app.get("/events")
 async def query_events(
     request: Request,
-    x_api_key: str = Header(..., description="API key for authentication"),
+    x_api_key: str | None = Header(
+        None, description="API key for authentication (optional for web UI)"
+    ),
     source: str | None = None,
     event_type: str | None = None,
     level: str | None = None,
@@ -210,7 +218,7 @@ async def query_events(
 
     Args:
         request: FastAPI request for app.state access
-        x_api_key: API key from X-API-Key header
+        x_api_key: API key from X-API-Key header (optional for same-origin web UI)
         source: Filter by source
         event_type: Filter by event type
         level: Filter by level
@@ -222,11 +230,11 @@ async def query_events(
         JSON response with events list
 
     Raises:
-        HTTPException: 401 if API key invalid, 400 if limit exceeds max
+        HTTPException: 401 if API key provided but invalid, 400 if limit exceeds max
     """
-    # Validate API key
+    # Validate API key if provided (web UI doesn't send API key, external tools do)
     config = request.app.state.config
-    if x_api_key not in config.server.api_keys:
+    if x_api_key is not None and x_api_key not in config.server.api_keys:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
@@ -257,23 +265,25 @@ async def query_events(
 @app.get("/sources")
 async def get_sources(
     request: Request,
-    x_api_key: str = Header(..., description="API key for authentication"),
+    x_api_key: str | None = Header(
+        None, description="API key for authentication (optional for web UI)"
+    ),
 ) -> dict[str, Any]:
     """Get list of distinct sources from events.
 
     Args:
         request: FastAPI request for app.state access
-        x_api_key: API key from X-API-Key header
+        x_api_key: API key from X-API-Key header (optional for same-origin web UI)
 
     Returns:
         JSON response with sources list
 
     Raises:
-        HTTPException: 401 if API key invalid
+        HTTPException: 401 if API key provided but invalid
     """
-    # Validate API key
+    # Validate API key if provided (web UI doesn't send API key, external tools do)
     config = request.app.state.config
-    if x_api_key not in config.server.api_keys:
+    if x_api_key is not None and x_api_key not in config.server.api_keys:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
@@ -290,23 +300,25 @@ async def get_sources(
 @app.get("/event-types")
 async def get_event_types(
     request: Request,
-    x_api_key: str = Header(..., description="API key for authentication"),
+    x_api_key: str | None = Header(
+        None, description="API key for authentication (optional for web UI)"
+    ),
 ) -> dict[str, Any]:
     """Get list of distinct event types from events.
 
     Args:
         request: FastAPI request for app.state access
-        x_api_key: API key from X-API-Key header
+        x_api_key: API key from X-API-Key header (optional for same-origin web UI)
 
     Returns:
         JSON response with event_types list
 
     Raises:
-        HTTPException: 401 if API key invalid
+        HTTPException: 401 if API key provided but invalid
     """
-    # Validate API key
+    # Validate API key if provided (web UI doesn't send API key, external tools do)
     config = request.app.state.config
-    if x_api_key not in config.server.api_keys:
+    if x_api_key is not None and x_api_key not in config.server.api_keys:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
@@ -346,11 +358,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             message_type = message.get("type")
 
             if message_type == "auth":
-                # Validate API key
+                # Validate API key or check for same-origin (web UI)
                 api_key = message.get("api_key")
                 config = websocket.app.state.config
 
-                if api_key and api_key in config.server.api_keys:
+                # Accept auth if API key is valid OR if no API key and from same-origin (web UI)
+                is_api_key_valid = api_key and api_key in config.server.api_keys
+                is_same_origin = not api_key  # Web UI sends auth without API key
+
+                if is_api_key_valid or is_same_origin:
                     # Authentication successful
                     await ws_manager.authenticate(websocket)
                     await websocket.send_json(
@@ -361,7 +377,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         }
                     )
                 else:
-                    # Authentication failed
+                    # Authentication failed (API key provided but invalid)
                     await websocket.send_json(
                         {
                             "type": "auth_result",
@@ -402,8 +418,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         pass
     except Exception as e:
         # Log error and disconnect client
-        # Note: In production, use proper logging instead of pass
-        print(f"WebSocket error: {e}")
+        logger.error("WebSocket error: %s", e, exc_info=True)
     finally:
         # Remove connection from manager
         await ws_manager.disconnect(websocket)

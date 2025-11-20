@@ -165,6 +165,8 @@ def config_init(force: bool) -> None:
     Creates config at ~/.config/argus/config.toml with secure defaults.
     File permissions are set to 600 (user-only read/write) to protect API keys.
     """
+    import secrets
+
     config_path = Path.home() / ".config" / "argus" / "config.toml"
 
     # Check if file exists
@@ -176,8 +178,11 @@ def config_init(force: bool) -> None:
     # Create parent directory
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Generate cryptographic random API key
+    api_key = secrets.token_urlsafe(32)
+
     # Generate TOML template with defaults from Config model
-    toml_content = """# Argus Configuration
+    toml_content = f"""# Argus Configuration
 #
 # SECURITY: This file contains API keys in plaintext.
 # File permissions are set to 600 (user-only read/write).
@@ -188,8 +193,8 @@ def config_init(force: bool) -> None:
 host = "127.0.0.1"
 # Server port
 port = 8765
-# API keys for authentication - CHANGE THESE!
-api_keys = ["CHANGE-ME-dev-key-placeholder"]
+# API keys for authentication (automatically generated on init)
+api_keys = ["{api_key}"]
 
 [database]
 # SQLite database path (tilde expansion supported)
@@ -233,8 +238,8 @@ output = "stdout"
     click.echo(f"Created config file: {config_path}")
     click.echo("File permissions set to 600 (user-only read/write)")
     click.echo("")
-    click.echo("⚠️  IMPORTANT: Change the placeholder API key before starting the server!")
-    click.echo("   Edit the 'api_keys' value in [server] section")
+    click.echo("✓ Generated secure API key (cryptographic random)")
+    click.echo("  API keys are stored in the config file under [server] section")
 
 
 @main.command()

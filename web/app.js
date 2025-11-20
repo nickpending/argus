@@ -4,7 +4,7 @@
 // Configuration
 const CONFIG = {
   wsUrl: `ws://${window.location.host}/ws`,
-  apiKey: "test-key-123", // TODO: Load from server config endpoint (task 9.3)
+  // No API key required - web UI uses same-origin authentication
   reconnect: {
     initialDelay: 5000, // 5 seconds
     maxDelay: 60000, // 60 seconds
@@ -172,7 +172,7 @@ function handleError(error) {
 function sendAuth() {
   const authMessage = {
     type: "auth",
-    api_key: CONFIG.apiKey,
+    // Web UI uses same-origin authentication, no API key needed
   };
 
   send(authMessage);
@@ -239,7 +239,8 @@ function renderEvent(event) {
   // Format level badge (null level = debug)
   const level = event.level || "debug";
   const levelText = event.level || "-";
-  const levelBadge = `<span class="level-badge ${level}">${levelText}</span>`;
+  // Escape both class name and display text to prevent XSS
+  const levelBadge = `<span class="level-badge ${escapeHtml(level)}">${escapeHtml(levelText)}</span>`;
 
   // Truncate message for table display
   const message = event.message || "-";
@@ -487,11 +488,8 @@ function rowMatchesFilter(row, filters) {
 // Load source options from API
 async function loadSourceOptions() {
   try {
-    const response = await fetch("/sources", {
-      headers: {
-        "X-API-Key": CONFIG.apiKey,
-      },
-    });
+    // No API key needed for same-origin requests
+    const response = await fetch("/sources");
 
     if (!response.ok) {
       console.error("Failed to load sources:", response.status);

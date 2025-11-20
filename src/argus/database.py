@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ class Database:
             db_path: Path to SQLite database file (tilde expansion handled by caller)
         """
         self.db_path = str(Path(db_path).expanduser().resolve())
+        self._lock = threading.Lock()  # Thread safety for concurrent access
 
         # Ensure parent directory exists
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -79,26 +81,27 @@ class Database:
         if "data" in event and event["data"] is not None:
             data_blob = json.dumps(event["data"])
 
-        # Insert event and commit before returning (durability guarantee)
-        with self.conn:
-            cursor = self.conn.execute(
-                """
-                INSERT INTO events (source, event_type, timestamp, message, level, data)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    event["source"],
-                    event["event_type"],
-                    timestamp,
-                    event.get("message"),
-                    event.get("level"),
-                    data_blob,
-                ),
-            )
-            event_id = cursor.lastrowid
-            if event_id is None:
-                raise RuntimeError("Failed to retrieve event ID after insertion")
-            return event_id
+        # Insert event with thread lock for concurrent safety
+        with self._lock:
+            with self.conn:
+                cursor = self.conn.execute(
+                    """
+                    INSERT INTO events (source, event_type, timestamp, message, level, data)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        event["source"],
+                        event["event_type"],
+                        timestamp,
+                        event.get("message"),
+                        event.get("level"),
+                        data_blob,
+                    ),
+                )
+                event_id = cursor.lastrowid
+                if event_id is None:
+                    raise RuntimeError("Failed to retrieve event ID after insertion")
+                return event_id
 
     def query_events(
         self,
@@ -212,20 +215,21 @@ class Database:
         cutoff = datetime.now(UTC) - timedelta(days=retention_days)
         cutoff_iso = cutoff.isoformat().replace("+00:00", "Z")
 
-        # Delete old events with parameterized query
-        with self.conn:
-            cursor = self.conn.execute(
-                "DELETE FROM events WHERE timestamp < ?",
-                (cutoff_iso,),
-            )
-            deleted_count = cursor.rowcount
+        # Delete old events with thread lock for concurrent safety
+        with self._lock:
+            with self.conn:
+                cursor = self.conn.execute(
+                    "DELETE FROM events WHERE timestamp < ?",
+                    (cutoff_iso,),
+                )
+                deleted_count = cursor.rowcount
 
-        # Optionally run VACUUM to reclaim disk space
-        # Note: VACUUM cannot run inside a transaction, so execute separately
-        if vacuum and deleted_count > 0:
-            self.conn.execute("VACUUM")
+            # Optionally run VACUUM to reclaim disk space
+            # Note: VACUUM cannot run inside a transaction, so execute separately
+            if vacuum and deleted_count > 0:
+                self.conn.execute("VACUUM")
 
-        return deleted_count
+            return deleted_count
 
     def close(self) -> None:
         """Close database connection."""
