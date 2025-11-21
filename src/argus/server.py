@@ -426,6 +426,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
 # Mount static files for web UI (serves at /)
 # Note: Must be mounted AFTER API routes to avoid shadowing /events endpoint
+# Try development location first, then installed location
 web_dir = Path(__file__).parent.parent.parent / "web"
+if not web_dir.exists():
+    # Try installed location (sys.prefix/share/argus/web)
+    import sys
+
+    web_dir = Path(sys.prefix) / "share" / "argus" / "web"
+
 if web_dir.exists():
     app.mount("/", StaticFiles(directory=str(web_dir), html=True), name="web")
+else:
+    logger.warning("Web UI directory not found at %s", web_dir)

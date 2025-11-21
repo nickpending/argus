@@ -1,0 +1,12 @@
+# Include web UI static files in source distribution
+recursive-include web *.html *.css *.js
+
+# Include documentation
+include README.md
+
+# Include tests
+recursive-include tests *.py
+
+# Exclude compiled Python files and caches
+global-exclude *.pyc
+global-exclude __pycache__
