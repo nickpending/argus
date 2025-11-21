@@ -156,9 +156,9 @@ def test_empty_filters_receive_all_events(client: TestClient) -> None:
 
         # Post events with different sources and types
         test_events = [
-            {"source": "app-1", "event_type": "type-a"},
-            {"source": "app-2", "event_type": "type-b"},
-            {"source": "app-3", "event_type": "type-c"},
+            {"source": "app-1", "event_type": "type_a"},
+            {"source": "app-2", "event_type": "type_b"},
+            {"source": "app-3", "event_type": "type_c"},
         ]
 
         for event_data in test_events:
@@ -214,7 +214,7 @@ def test_disconnected_clients_removed(client: TestClient) -> None:
             "/events",
             json={
                 "source": "cleanup-test",
-                "event_type": "after-disconnect",
+                "event_type": "after_disconnect",
                 "message": "After client 1 disconnected",
             },
             headers={"X-API-Key": "test-key-1"},

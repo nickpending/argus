@@ -1,5 +1,7 @@
 """Pydantic models for events and configuration."""
 
+import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -112,20 +114,67 @@ class EventCreate(BaseModel):
     Timestamp auto-generated if not provided.
     """
 
-    source: str = Field(..., min_length=1, description="Producing application identifier")
-    event_type: str = Field(..., min_length=1, description="Event category")
+    source: str = Field(
+        ..., min_length=1, max_length=50, description="Producing application identifier"
+    )
+    event_type: str = Field(..., min_length=1, max_length=50, description="Event category")
     timestamp: str | None = Field(default=None, description="ISO8601 timestamp (UTC with Z suffix)")
-    message: str | None = Field(default=None, description="Human-readable description")
+    message: str | None = Field(
+        default=None, max_length=2000, description="Human-readable description"
+    )
     level: str | None = Field(default=None, description="Log level (debug/info/warn/error)")
     data: dict[str, Any] | None = Field(default=None, description="Arbitrary JSON data")
 
-    @field_validator("source", "event_type")
+    @field_validator("source")
     @classmethod
-    def validate_non_empty(cls, v: str) -> str:
-        """Ensure source and event_type are non-empty."""
-        if not v or not v.strip():
-            raise ValueError("Field must not be empty")
-        return v.strip()
+    def validate_source_pattern(cls, v: str) -> str:
+        """Validate source matches pattern: lowercase start, alphanumeric + hyphens."""
+        v = v.strip()
+        if not v:
+            raise ValueError("source must not be empty")
+        if not re.match(r"^[a-z][a-z0-9-]*$", v):
+            raise ValueError(
+                "source must start with lowercase letter and contain only lowercase letters, numbers, and hyphens"
+            )
+        return v
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_event_type_pattern(cls, v: str) -> str:
+        """Validate event_type matches pattern: lowercase start, alphanumeric + underscores/dots."""
+        v = v.strip()
+        if not v:
+            raise ValueError("event_type must not be empty")
+        if not re.match(r"^[a-z][a-z0-9_.]*$", v):
+            raise ValueError(
+                "event_type must start with lowercase letter and contain only lowercase letters, numbers, underscores, and dots"
+            )
+        return v
+
+    @field_validator("level")
+    @classmethod
+    def validate_level_enum(cls, v: str | None) -> str | None:
+        """Validate level is a valid log level if provided."""
+        if v is None:
+            return None
+        v = v.strip().lower()
+        valid_levels = {"debug", "info", "warn", "error"}
+        if v not in valid_levels:
+            raise ValueError(f"level must be one of {valid_levels} or None")
+        return v
+
+    @field_validator("timestamp")
+    @classmethod
+    def validate_timestamp_format(cls, v: str | None) -> str | None:
+        """Validate timestamp is ISO8601 format if provided."""
+        if v is None:
+            return None
+        try:
+            # Attempt to parse ISO8601 timestamp
+            datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except ValueError as e:
+            raise ValueError(f"timestamp must be valid ISO8601 format: {e}") from e
+        return v
 
 
 class Event(BaseModel):

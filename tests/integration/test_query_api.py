@@ -142,9 +142,9 @@ def test_discovery_endpoints_return_complete_sorted_lists(client: TestClient) ->
     """
     # Create events with multiple sources and types
     test_events = [
-        {"source": "zebra", "event_type": "type-z", "message": "Test Z"},
-        {"source": "alpha", "event_type": "type-a", "message": "Test A"},
-        {"source": "beta", "event_type": "type-b", "message": "Test B"},
+        {"source": "zebra", "event_type": "type_z", "message": "Test Z"},
+        {"source": "alpha", "event_type": "type_a", "message": "Test A"},
+        {"source": "beta", "event_type": "type_b", "message": "Test B"},
     ]
 
     for event in test_events:
@@ -177,12 +177,12 @@ def test_discovery_endpoints_return_complete_sorted_lists(client: TestClient) ->
     event_types = response.json()["event_types"]
 
     # Verify all types present
-    assert "type-a" in event_types
-    assert "type-b" in event_types
-    assert "type-z" in event_types
+    assert "type_a" in event_types
+    assert "type_b" in event_types
+    assert "type_z" in event_types
 
     # Verify alphabetically sorted
-    type_a_idx = event_types.index("type-a")
-    type_b_idx = event_types.index("type-b")
-    type_z_idx = event_types.index("type-z")
+    type_a_idx = event_types.index("type_a")
+    type_b_idx = event_types.index("type_b")
+    type_z_idx = event_types.index("type_z")
     assert type_a_idx < type_b_idx < type_z_idx
