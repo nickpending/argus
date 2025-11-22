@@ -88,6 +88,9 @@ ehthumbs.db
 # Playwright MCP
 .playwright-mcp/
 
+# MCP configuration (local paths)
+.mcp.json
+
 # Data and backups
 data/
 backups/
