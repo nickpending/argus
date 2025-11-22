@@ -246,7 +246,7 @@ WebSocket Client ◄─── Filter by source/type/level ◄───┘       
 ### Install from Source
 
 ```bash
-git clone https://github.com/yourusername/argus.git
+git clone https://github.com/nickpending/argus.git
 cd argus
 uv sync
 ```

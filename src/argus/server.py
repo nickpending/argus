@@ -362,11 +362,24 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 api_key = message.get("api_key")
                 config = websocket.app.state.config
 
-                # Accept auth if API key is valid OR if no API key and from same-origin (web UI)
+                # Check if API key is valid
                 is_api_key_valid = api_key and api_key in config.server.api_keys
-                is_same_origin = not api_key  # Web UI sends auth without API key
 
-                if is_api_key_valid or is_same_origin:
+                # Check if request is from web UI (same server, identified by matching port)
+                is_web_ui = False
+                if not api_key:
+                    # No API key provided - check if Origin port matches server port
+                    origin = websocket.headers.get("origin", "")
+                    if origin:
+                        try:
+                            # Parse port from Origin (e.g., "http://192.168.1.100:8765")
+                            origin_port = int(origin.split(":")[-1].rstrip("/"))
+                            is_web_ui = origin_port == config.server.port
+                        except (ValueError, IndexError):
+                            # Invalid Origin format - not from web UI
+                            is_web_ui = False
+
+                if is_api_key_valid or is_web_ui:
                     # Authentication successful
                     await ws_manager.authenticate(websocket)
                     await websocket.send_json(
@@ -377,12 +390,13 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         }
                     )
                 else:
-                    # Authentication failed (API key provided but invalid)
+                    # Authentication failed (API key invalid or missing Origin/wrong port)
+                    error_msg = "Invalid API key" if api_key else "API key required"
                     await websocket.send_json(
                         {
                             "type": "auth_result",
                             "status": "error",
-                            "message": "Invalid API key",
+                            "message": error_msg,
                         }
                     )
                     await websocket.close(code=1008)  # Policy violation

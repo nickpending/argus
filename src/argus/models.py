@@ -11,9 +11,9 @@ from pydantic import BaseModel, Field, field_validator
 class ServerConfig(BaseModel):
     """Server configuration.
 
-    Security note: Default host 0.0.0.0 binds to all interfaces for local network access.
-    This is intentional for the observability use case, protected by API key authentication.
-    For localhost-only access, set host to "127.0.0.1" in config.
+    Security note: Default host 127.0.0.1 binds to localhost only for security.
+    For local network access, set host to "0.0.0.0" in config.
+    Network access is protected by API key authentication.
     """
 
     host: str = Field(default="127.0.0.1", description="Bind address")

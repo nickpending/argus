@@ -275,3 +275,72 @@ def test_broadcast_reaches_all_matching_clients(client: TestClient) -> None:
         msg = websocket.receive_json()
         assert msg["type"] == "event"
         assert msg["event"]["source"] == "broadcast-test"
+
+
+def test_web_ui_auth_without_api_key(client: TestClient) -> None:
+    """
+    INVARIANT: Web UI can authenticate without API key using Origin validation
+    BREAKS: Web UI cannot connect (usability failure)
+
+    Security model: Web UI served by same server, authenticated by matching Origin port.
+    TestClient creates localhost connections similar to web UI browser requests.
+    """
+    with client.websocket_connect("/ws", headers={"Origin": "http://127.0.0.1:8765"}) as websocket:
+        # Authenticate WITHOUT API key (web UI pattern)
+        websocket.send_json({"type": "auth"})
+        auth_response = websocket.receive_json()
+
+        assert auth_response["type"] == "auth_result"
+        assert auth_response["status"] == "success"
+
+
+def test_network_connection_without_api_key_rejected(client: TestClient) -> None:
+    """
+    INVARIANT: Connections without API key from wrong port are rejected (P0 fix)
+    BREAKS: Authentication bypass vulnerability
+
+    Attack vector: External client connects without API key, pretending different Origin.
+    Must be rejected even if Origin header is present but port doesn't match.
+    """
+    with client.websocket_connect(
+        "/ws", headers={"Origin": "http://192.168.1.100:9999"}
+    ) as websocket:
+        # Attempt auth without API key from different port
+        websocket.send_json({"type": "auth"})
+        auth_response = websocket.receive_json()
+
+        assert auth_response["type"] == "auth_result"
+        assert auth_response["status"] == "error"
+        assert "api key required" in auth_response["message"].lower()
+
+        # Connection should close
+        try:
+            websocket.receive_json()
+            pytest.fail("Connection should have closed after auth failure")
+        except WebSocketDisconnect:
+            pass
+
+
+def test_no_origin_header_without_api_key_rejected(client: TestClient) -> None:
+    """
+    INVARIANT: Connections without Origin header and no API key are rejected
+    BREAKS: Non-browser clients bypass authentication
+
+    Edge case: Non-browser tools may not send Origin header.
+    Without API key, must be rejected (fail secure).
+    """
+    with client.websocket_connect("/ws") as websocket:
+        # Attempt auth without API key and no Origin header
+        websocket.send_json({"type": "auth"})
+        auth_response = websocket.receive_json()
+
+        assert auth_response["type"] == "auth_result"
+        assert auth_response["status"] == "error"
+        assert "api key required" in auth_response["message"].lower()
+
+        # Connection should close
+        try:
+            websocket.receive_json()
+            pytest.fail("Connection should have closed after auth failure")
+        except WebSocketDisconnect:
+            pass
