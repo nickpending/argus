@@ -39,11 +39,11 @@ Think of it as having a single pane of glass for all your local development tool
 uv sync
 
 # Initialize configuration
-uv run argus config init
+argus config init
 # Edit ~/.config/argus/config.toml - set your API key
 
 # Start server
-uv run argus serve
+argus serve
 # Server running on http://127.0.0.1:8765
 
 # Open web UI
@@ -243,9 +243,13 @@ WebSocket Client ◄─── Filter by source/type/level ◄───┘       
 - **Python 3.11+**
 - **uv package manager** - [Install here](https://github.com/astral-sh/uv)
 
-### Install from Source
+### Quick Install
 
 ```bash
+# Install as CLI tool (recommended)
+uv tool install git+https://github.com/nickpending/argus.git
+
+# Or clone and install from source
 git clone https://github.com/nickpending/argus.git
 cd argus
 uv sync
@@ -254,8 +258,8 @@ uv sync
 ### Configuration
 
 ```bash
-# Initialize default config
-uv run argus config init
+# Initialize default config (use 'argus' directly if installed via uv tool)
+argus config init
 
 # Edit configuration
 vim ~/.config/argus/config.toml
@@ -296,22 +300,22 @@ level = "info"
 
 ```bash
 # Default config (~/.config/argus/config.toml)
-uv run argus serve
+argus serve
 
 # Custom config location
-uv run argus serve --config /path/to/config.toml
+argus serve --config /path/to/config.toml
 
 # Override host/port
-uv run argus serve --host 0.0.0.0 --port 9000
+argus serve --host 0.0.0.0 --port 9000
 ```
 
 ### Querying Events
 
 ```bash
 # CLI queries
-uv run argus query --source sable --limit 10
-uv run argus query --event-type error --level error
-uv run argus query --since 2025-11-20T00:00:00Z --json
+argus query --source sable --limit 10
+argus query --event-type error --level error
+argus query --since 2025-11-20T00:00:00Z --json
 
 # HTTP API queries
 curl "http://127.0.0.1:8765/events?source=sable&limit=10" \
@@ -395,7 +399,7 @@ ws.onmessage = (event) => {
 
 ```bash
 # Check if server is running
-uv run argus status
+argus status
 
 # Output:
 # ✓ Argus server is running

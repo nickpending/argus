@@ -115,7 +115,7 @@ async def lifespan(app: FastAPI) -> Any:
 app = FastAPI(
     title="Argus Event Observability",
     description="Local-network observability platform for development tools",
-    version="0.1.0",
+    version="0.1.1",
     lifespan=lifespan,
 )
 
