@@ -294,6 +294,50 @@ level = "info"
 
 **Security Note:** Config file is created with 600 permissions (user-only read/write). Never commit `config.toml` to git.
 
+### Auto-Start with launchd (macOS)
+
+Run Argus automatically on login using macOS launchd:
+
+```bash
+# 1. Copy the plist template
+cp install/com.voidwire.argus.plist ~/Library/LaunchAgents/
+
+# 2. Edit paths - replace USERNAME with your actual username
+#    (launchd requires absolute paths, no ~ expansion)
+sed -i '' "s/USERNAME/$USER/g" ~/Library/LaunchAgents/com.voidwire.argus.plist
+
+# 3. Load the service
+launchctl load ~/Library/LaunchAgents/com.voidwire.argus.plist
+```
+
+**Managing the Service:**
+
+```bash
+# Check status (shows PID if running)
+launchctl list | grep argus
+
+# Stop service
+launchctl stop com.voidwire.argus
+
+# Start service
+launchctl start com.voidwire.argus
+
+# Unload (disable auto-start)
+launchctl unload ~/Library/LaunchAgents/com.voidwire.argus.plist
+
+# View logs
+tail -f /tmp/argus.out.log /tmp/argus.err.log
+```
+
+**Troubleshooting:**
+
+| Issue | Solution |
+|-------|----------|
+| Service not starting | Check paths in plist match your system (`plutil -p ~/Library/LaunchAgents/com.voidwire.argus.plist`) |
+| "could not find executable" | Verify argus is installed: `which argus` and update plist path |
+| Config errors in logs | Run `argus config init` to create config, then reload service |
+| Port already in use | Check for existing argus: `lsof -i :8765` |
+
 ## 🚀 Usage Patterns
 
 ### Starting the Server
