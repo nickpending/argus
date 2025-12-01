@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Argus LaunchAgent Template
+
+  IMPORTANT: Before installing, replace all instances of:
+    /Users/USERNAME  ->  Your actual home directory (e.g., /Users/rudy)
+
+  Installation:
+    1. Copy to ~/Library/LaunchAgents/
+    2. Edit paths to match your system
+    3. Load: launchctl load ~/Library/LaunchAgents/com.voidwire.argus.plist
+
+  Management:
+    - Start:   launchctl start com.voidwire.argus
+    - Stop:    launchctl stop com.voidwire.argus
+    - Unload:  launchctl unload ~/Library/LaunchAgents/com.voidwire.argus.plist
+    - Status:  launchctl list | grep argus
+    - Logs:    tail -f /tmp/argus.out.log /tmp/argus.err.log
+-->
+<plist version="1.0">
+<dict>
+    <!-- Service identifier -->
+    <key>Label</key>
+    <string>com.voidwire.argus</string>
+
+    <!-- Command to run: argus serve -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/USERNAME/.local/bin/argus</string>
+        <string>serve</string>
+    </array>
+
+    <!-- Working directory for database storage -->
+    <key>WorkingDirectory</key>
+    <string>/Users/USERNAME/.local/share/argus</string>
+
+    <!-- Start on login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Restart if crashes -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Log stdout and stderr for debugging -->
+    <key>StandardOutPath</key>
+    <string>/tmp/argus.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/argus.err.log</string>
+
+    <!-- Environment variables (optional, uncomment if needed) -->
+    <!--
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>ARGUS_CONFIG</key>
+        <string>/Users/USERNAME/.config/argus/config.toml</string>
+    </dict>
+    -->
+</dict>
+</plist>
