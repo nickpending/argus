@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+from importlib.metadata import version
 from pathlib import Path
 
 import click
@@ -13,6 +14,7 @@ from argus.config import ConfigError, load_config
 
 
 @click.group()
+@click.version_option(version=version("argus"), prog_name="argus")
 def main() -> None:
     """Argus observability platform CLI."""
     pass

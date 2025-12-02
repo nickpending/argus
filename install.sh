@@ -87,7 +87,7 @@ install_argus() {
 
     # Verify installation
     if command -v argus &> /dev/null; then
-        success "argus installed: $(argus --version 2>/dev/null || echo 'version check failed')"
+        success "argus installed: $(argus --version)"
     else
         # Try adding uv tools to PATH
         export PATH="$HOME/.local/bin:$PATH"
