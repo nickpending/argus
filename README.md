@@ -300,14 +300,14 @@ Run Argus automatically on login using macOS launchd:
 
 ```bash
 # 1. Copy the plist template
-cp install/com.voidwire.argus.plist ~/Library/LaunchAgents/
+cp install/info.voidwire.argus.plist ~/Library/LaunchAgents/
 
 # 2. Edit paths - replace USERNAME with your actual username
 #    (launchd requires absolute paths, no ~ expansion)
-sed -i '' "s/USERNAME/$USER/g" ~/Library/LaunchAgents/com.voidwire.argus.plist
+sed -i '' "s/USERNAME/$USER/g" ~/Library/LaunchAgents/info.voidwire.argus.plist
 
 # 3. Load the service
-launchctl load ~/Library/LaunchAgents/com.voidwire.argus.plist
+launchctl load ~/Library/LaunchAgents/info.voidwire.argus.plist
 ```
 
 **Managing the Service:**
@@ -317,13 +317,13 @@ launchctl load ~/Library/LaunchAgents/com.voidwire.argus.plist
 launchctl list | grep argus
 
 # Stop service
-launchctl stop com.voidwire.argus
+launchctl stop info.voidwire.argus
 
 # Start service
-launchctl start com.voidwire.argus
+launchctl start info.voidwire.argus
 
 # Unload (disable auto-start)
-launchctl unload ~/Library/LaunchAgents/com.voidwire.argus.plist
+launchctl unload ~/Library/LaunchAgents/info.voidwire.argus.plist
 
 # View logs
 tail -f /tmp/argus.out.log /tmp/argus.err.log
@@ -333,7 +333,7 @@ tail -f /tmp/argus.out.log /tmp/argus.err.log
 
 | Issue | Solution |
 |-------|----------|
-| Service not starting | Check paths in plist match your system (`plutil -p ~/Library/LaunchAgents/com.voidwire.argus.plist`) |
+| Service not starting | Check paths in plist match your system (`plutil -p ~/Library/LaunchAgents/info.voidwire.argus.plist`) |
 | "could not find executable" | Verify argus is installed: `which argus` and update plist path |
 | Config errors in logs | Run `argus config init` to create config, then reload service |
 | Port already in use | Check for existing argus: `lsof -i :8765` |

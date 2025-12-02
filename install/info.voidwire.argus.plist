@@ -9,12 +9,12 @@
   Installation:
     1. Copy to ~/Library/LaunchAgents/
     2. Edit paths to match your system
-    3. Load: launchctl load ~/Library/LaunchAgents/com.voidwire.argus.plist
+    3. Load: launchctl load ~/Library/LaunchAgents/info.voidwire.argus.plist
 
   Management:
-    - Start:   launchctl start com.voidwire.argus
-    - Stop:    launchctl stop com.voidwire.argus
-    - Unload:  launchctl unload ~/Library/LaunchAgents/com.voidwire.argus.plist
+    - Start:   launchctl start info.voidwire.argus
+    - Stop:    launchctl stop info.voidwire.argus
+    - Unload:  launchctl unload ~/Library/LaunchAgents/info.voidwire.argus.plist
     - Status:  launchctl list | grep argus
     - Logs:    tail -f /tmp/argus.out.log /tmp/argus.err.log
 -->
@@ -22,7 +22,7 @@
 <dict>
     <!-- Service identifier -->
     <key>Label</key>
-    <string>com.voidwire.argus</string>
+    <string>info.voidwire.argus</string>
 
     <!-- Command to run: argus serve -->
     <key>ProgramArguments</key>
