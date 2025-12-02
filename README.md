@@ -246,7 +246,16 @@ WebSocket Client ◄─── Filter by source/type/level ◄───┘       
 ### Quick Install
 
 ```bash
-# Install as CLI tool (recommended)
+# One-command install (recommended)
+curl -fsSL https://raw.githubusercontent.com/nickpending/argus/main/install.sh | bash
+```
+
+This installs uv (if needed), argus, creates default config, and optionally sets up auto-start.
+
+**Alternative methods:**
+
+```bash
+# Install as CLI tool (if you already have uv)
 uv tool install git+https://github.com/nickpending/argus.git
 
 # Or clone and install from source
