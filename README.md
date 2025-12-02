@@ -338,6 +338,60 @@ tail -f /tmp/argus.out.log /tmp/argus.err.log
 | Config errors in logs | Run `argus config init` to create config, then reload service |
 | Port already in use | Check for existing argus: `lsof -i :8765` |
 
+### Auto-Start with systemd (Linux)
+
+Run Argus automatically on login using systemd user services:
+
+```bash
+# 1. Create the systemd user directory (if it doesn't exist)
+mkdir -p ~/.config/systemd/user
+
+# 2. Copy the service file
+cp install/argus.service ~/.config/systemd/user/
+
+# 3. Reload systemd and enable the service
+systemctl --user daemon-reload
+systemctl --user enable argus
+systemctl --user start argus
+```
+
+**Managing the Service:**
+
+```bash
+# Check status
+systemctl --user status argus
+
+# Stop service
+systemctl --user stop argus
+
+# Start service
+systemctl --user start argus
+
+# Restart service
+systemctl --user restart argus
+
+# Disable auto-start
+systemctl --user disable argus
+
+# View logs (live)
+journalctl --user -u argus -f
+
+# View recent logs
+journalctl --user -u argus --since "1 hour ago"
+```
+
+**Troubleshooting:**
+
+| Issue | Solution |
+|-------|----------|
+| Service not starting | Check logs: `journalctl --user -u argus -e` |
+| "could not find executable" | Verify argus is installed: `which argus` (should be `~/.local/bin/argus`) |
+| Config errors in logs | Run `argus config init` to create config, then restart: `systemctl --user restart argus` |
+| Port already in use | Check for existing argus: `ss -tlnp | grep 8765` |
+| Service not persisting after reboot | Enable lingering: `loginctl enable-linger $USER` |
+
+**Note:** The `%h` specifier in the service file automatically expands to your home directory - no manual path editing required.
+
 ## 🚀 Usage Patterns
 
 ### Starting the Server

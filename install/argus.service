@@ -1,0 +1,46 @@
+# Argus systemd User Service
+#
+# Installation:
+#   1. Copy to ~/.config/systemd/user/
+#      mkdir -p ~/.config/systemd/user
+#      cp install/argus.service ~/.config/systemd/user/
+#
+#   2. Reload systemd daemon
+#      systemctl --user daemon-reload
+#
+#   3. Enable and start
+#      systemctl --user enable argus
+#      systemctl --user start argus
+#
+# Management:
+#   - Status:  systemctl --user status argus
+#   - Stop:    systemctl --user stop argus
+#   - Start:   systemctl --user start argus
+#   - Restart: systemctl --user restart argus
+#   - Disable: systemctl --user disable argus
+#   - Logs:    journalctl --user -u argus -f
+#
+# Note: %h expands to your home directory automatically.
+# Requires argus installed via: uv tool install git+https://github.com/nickpending/argus.git
+
+[Unit]
+Description=Argus Observability Server
+Documentation=https://github.com/nickpending/argus
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/argus serve
+WorkingDirectory=%h/.local/share/argus
+Restart=on-failure
+RestartSec=5s
+
+# Logging to systemd journal
+StandardOutput=journal
+StandardError=journal
+
+# Environment (uncomment if needed)
+# Environment="ARGUS_CONFIG=%h/.config/argus/config.toml"
+
+[Install]
+WantedBy=default.target
