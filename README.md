@@ -386,6 +386,7 @@ journalctl --user -u argus --since "1 hour ago"
 |-------|----------|
 | Service not starting | Check logs: `journalctl --user -u argus -e` |
 | "could not find executable" | Verify argus is installed: `which argus` (should be `~/.local/bin/argus`) |
+| CHDIR error (status=200) | Create data directory: `mkdir -p ~/.local/share/argus` |
 | Config errors in logs | Run `argus config init` to create config, then restart: `systemctl --user restart argus` |
 | Port already in use | Check for existing argus: `ss -tlnp | grep 8765` |
 | Service not persisting after reboot | Enable lingering: `loginctl enable-linger $USER` |
