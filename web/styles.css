@@ -352,6 +352,48 @@ button:hover {
     color: var(--level-error);
 }
 
+/* Time Range Chips */
+.time-range-chips {
+    display: flex;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+}
+
+.time-range-custom {
+    display: none;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.time-range-custom.visible {
+    display: flex;
+}
+
+.time-range-custom input[type="datetime-local"] {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 0.625rem 0.75rem;
+    border-radius: 4px;
+    font-size: var(--text-sm);
+    font-family: var(--font-mono);
+    transition: all var(--transition-fast);
+}
+
+.time-range-custom input[type="datetime-local"]:focus {
+    outline: none;
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 2px var(--cyan-glow);
+}
+
+/* Datetime input icon color fix for dark theme */
+.time-range-custom input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+    cursor: pointer;
+}
+
 /* Filter Actions */
 .filter-actions {
     display: flex;

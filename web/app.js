@@ -19,6 +19,7 @@ const state = {
   reconnectTimer: null,
   authenticated: false,
   currentFilters: {},
+  currentTimeRange: "all", // "all", "1h", "24h", "7d", "custom"
   eventCount: 0,
   selectedEventId: null,
 };
@@ -67,6 +68,14 @@ function cacheElements() {
   elements.filterApply = document.getElementById("filter-apply");
   elements.filterClear = document.getElementById("filter-clear");
   elements.levelChips = document.querySelectorAll(".level-chips .chip");
+
+  // Time range elements
+  elements.timeRangeChips = document.querySelectorAll(
+    ".time-range-chips .chip",
+  );
+  elements.timeRangeCustom = document.getElementById("time-range-custom");
+  elements.filterTimeStart = document.getElementById("filter-time-start");
+  elements.filterTimeEnd = document.getElementById("filter-time-end");
 }
 
 // Initialize event listeners
@@ -89,6 +98,40 @@ function initializeEventListeners() {
       chip.classList.toggle("active");
       applyFilters();
     });
+  });
+
+  // Time range chip buttons (exclusive selection)
+  elements.timeRangeChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      // Remove active from all time range chips
+      elements.timeRangeChips.forEach((c) => c.classList.remove("active"));
+      // Activate clicked chip
+      chip.classList.add("active");
+
+      const range = chip.dataset.range;
+      state.currentTimeRange = range;
+
+      // Show/hide custom datetime inputs
+      if (range === "custom") {
+        elements.timeRangeCustom.classList.add("visible");
+      } else {
+        elements.timeRangeCustom.classList.remove("visible");
+      }
+
+      applyFilters();
+    });
+  });
+
+  // Custom time range inputs (apply on change)
+  elements.filterTimeStart.addEventListener("change", () => {
+    if (state.currentTimeRange === "custom") {
+      applyFilters();
+    }
+  });
+  elements.filterTimeEnd.addEventListener("change", () => {
+    if (state.currentTimeRange === "custom") {
+      applyFilters();
+    }
   });
 
   // Filter apply button
@@ -228,6 +271,7 @@ function renderEvent(event) {
   const row = document.createElement("tr");
   row.className = "event-row";
   row.dataset.eventId = event.id;
+  row.dataset.timestamp = event.timestamp;
   if (event.level) {
     row.dataset.level = event.level;
   }
@@ -411,7 +455,50 @@ function collectFilters() {
     filters.search = search;
   }
 
+  // Time range filter
+  const timeRange = getTimeRange();
+  if (timeRange.since) {
+    filters.time_since = timeRange.since;
+  }
+  if (timeRange.until) {
+    filters.time_until = timeRange.until;
+  }
+
   return filters;
+}
+
+// Calculate time range based on current selection
+function getTimeRange() {
+  const range = state.currentTimeRange;
+  const now = new Date();
+
+  switch (range) {
+    case "1h":
+      return { since: new Date(now.getTime() - 60 * 60 * 1000).toISOString() };
+    case "24h":
+      return {
+        since: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+      };
+    case "7d":
+      return {
+        since: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+    case "custom": {
+      const result = {};
+      const startVal = elements.filterTimeStart.value;
+      const endVal = elements.filterTimeEnd.value;
+      if (startVal) {
+        result.since = new Date(startVal).toISOString();
+      }
+      if (endVal) {
+        result.until = new Date(endVal).toISOString();
+      }
+      return result;
+    }
+    default:
+      // "all" - no time filter
+      return {};
+  }
 }
 
 // Apply current filters
@@ -431,6 +518,15 @@ function clearFilters() {
   elements.levelChips.forEach((chip) => {
     chip.classList.add("active");
   });
+
+  // Reset time range to "All"
+  elements.timeRangeChips.forEach((chip) => {
+    chip.classList.toggle("active", chip.dataset.range === "all");
+  });
+  elements.timeRangeCustom.classList.remove("visible");
+  elements.filterTimeStart.value = "";
+  elements.filterTimeEnd.value = "";
+  state.currentTimeRange = "all";
 
   state.currentFilters = {};
   filterTableRows({});
@@ -487,6 +583,26 @@ function rowMatchesFilter(row, filters) {
     const searchLower = filters.search.toLowerCase();
     if (!rowData.message.toLowerCase().includes(searchLower)) {
       return false;
+    }
+  }
+
+  // Time range filtering
+  if (filters.time_since || filters.time_until) {
+    const eventTimestamp = row.dataset.timestamp;
+    if (eventTimestamp) {
+      const eventTime = new Date(eventTimestamp).getTime();
+      if (filters.time_since) {
+        const sinceTime = new Date(filters.time_since).getTime();
+        if (eventTime < sinceTime) {
+          return false;
+        }
+      }
+      if (filters.time_until) {
+        const untilTime = new Date(filters.time_until).getTime();
+        if (eventTime > untilTime) {
+          return false;
+        }
+      }
     }
   }
 

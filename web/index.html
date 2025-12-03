@@ -62,6 +62,21 @@
                 </div>
 
                 <div class="filter-group">
+                    <label>Time Range</label>
+                    <div class="time-range-chips">
+                        <button class="chip active" data-range="all">All</button>
+                        <button class="chip" data-range="1h">1h</button>
+                        <button class="chip" data-range="24h">24h</button>
+                        <button class="chip" data-range="7d">7d</button>
+                        <button class="chip" data-range="custom">Custom</button>
+                    </div>
+                    <div class="time-range-custom" id="time-range-custom">
+                        <input type="datetime-local" id="filter-time-start" placeholder="Start">
+                        <input type="datetime-local" id="filter-time-end" placeholder="End">
+                    </div>
+                </div>
+
+                <div class="filter-group">
                     <label for="filter-search">Search Message</label>
                     <input type="text" id="filter-search" placeholder="Search in messages...">
                 </div>
