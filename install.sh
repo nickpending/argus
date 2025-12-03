@@ -83,7 +83,7 @@ install_uv() {
 # Install argus
 install_argus() {
     info "Installing argus..."
-    uv tool install --upgrade git+https://github.com/nickpending/argus.git
+    uv tool install --reinstall git+https://github.com/nickpending/argus.git
 
     # Verify installation
     if command -v argus &> /dev/null; then
