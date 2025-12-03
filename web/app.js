@@ -356,12 +356,8 @@ function showEventDetail(event, row) {
   elements.detailLevel.textContent = event.level || "-";
   elements.detailMessage.textContent = event.message || "-";
 
-  // Pretty-print JSON data
-  if (event.data) {
-    elements.detailDataJson.textContent = JSON.stringify(event.data, null, 2);
-  } else {
-    elements.detailDataJson.textContent = "null";
-  }
+  // Pretty-print JSON data with syntax highlighting
+  elements.detailDataJson.innerHTML = highlightJson(event.data);
 
   // Show detail view
   elements.rightPanel.classList.add("has-selection");
@@ -393,6 +389,37 @@ function escapeHtml(text) {
   const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Syntax highlight JSON for display
+function highlightJson(data) {
+  if (data === null || data === undefined) {
+    return '<span class="json-null">null</span>';
+  }
+
+  const json = JSON.stringify(data, null, 2);
+
+  // Escape HTML first, then apply highlighting
+  const escaped = escapeHtml(json);
+
+  // Apply syntax highlighting with regex
+  return (
+    escaped
+      // Keys (property names before colon)
+      .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
+      // String values (after colon or in arrays)
+      .replace(/: "([^"]*)"/g, ': <span class="json-string">"$1"</span>')
+      .replace(/\["([^"]*)"/g, '[<span class="json-string">"$1"</span>')
+      .replace(/, "([^"]*)"/g, ', <span class="json-string">"$1"</span>')
+      // Numbers
+      .replace(/: (-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
+      .replace(/\[(-?\d+\.?\d*)/g, '[<span class="json-number">$1</span>')
+      .replace(/, (-?\d+\.?\d*)/g, ', <span class="json-number">$1</span>')
+      // Booleans
+      .replace(/: (true|false)/g, ': <span class="json-boolean">$1</span>')
+      // Null
+      .replace(/: (null)/g, ': <span class="json-null">$1</span>')
+  );
 }
 
 // Update connection status indicator

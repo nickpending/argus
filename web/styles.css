@@ -564,7 +564,12 @@ button:hover {
 }
 
 .detail-view {
-    display: none;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity var(--transition-normal), transform var(--transition-normal);
+    pointer-events: none;
+    position: absolute;
+    width: calc(100% - 2rem);
 }
 
 .right-panel.has-selection .detail-empty {
@@ -572,7 +577,11 @@ button:hover {
 }
 
 .right-panel.has-selection .detail-view {
-    display: block;
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+    position: relative;
+    width: auto;
 }
 
 /* Detail Fields */
@@ -615,6 +624,13 @@ button:hover {
     color: var(--text-primary);
     max-height: 300px;
 }
+
+/* JSON Syntax Highlighting */
+.json-key { color: var(--cyan); }
+.json-string { color: var(--text-primary); }
+.json-number { color: #f5a623; }
+.json-boolean { color: var(--purple); }
+.json-null { color: var(--text-tertiary); }
 
 /* ========================================
    RESPONSIVE
