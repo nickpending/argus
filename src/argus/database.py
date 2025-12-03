@@ -9,13 +9,14 @@ from typing import Any
 
 
 class Database:
-    """SQLite database with WAL mode for event storage."""
+    """SQLite database for event storage."""
 
-    def __init__(self, db_path: str) -> None:
+    def __init__(self, db_path: str, journal_mode: str = "WAL") -> None:
         """Initialize database connection and schema.
 
         Args:
             db_path: Path to SQLite database file (tilde expansion handled by caller)
+            journal_mode: SQLite journal mode (WAL, DELETE, TRUNCATE, etc.)
         """
         self.db_path = str(Path(db_path).expanduser().resolve())
         self._lock = threading.Lock()  # Thread safety for concurrent access
@@ -23,9 +24,9 @@ class Database:
         # Ensure parent directory exists
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
 
-        # Connect and enable WAL mode
+        # Connect and set journal mode
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
-        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute(f"PRAGMA journal_mode={journal_mode}")
 
         # Create schema if not exists
         self._create_schema()

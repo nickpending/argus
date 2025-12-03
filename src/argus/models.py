@@ -69,28 +69,12 @@ class RetentionConfig(BaseModel):
         return v
 
 
-class LimitsConfig(BaseModel):
-    """Request limits configuration."""
-
-    max_event_size_kb: int = Field(default=512, gt=0, description="Max event size in KB")
-    max_batch_size: int = Field(default=100, ge=1, description="Max events per batch POST")
-
-
-class WebUIConfig(BaseModel):
-    """Web UI configuration."""
-
-    enabled: bool = Field(default=True, description="Serve web UI")
-    static_path: str | None = Field(default=None, description="Custom UI files path")
-
-
 class LoggingConfig(BaseModel):
     """Logging configuration."""
 
     level: Literal["debug", "info", "warn", "error"] = Field(
         default="info", description="Log level"
     )
-    format: Literal["json", "text"] = Field(default="json", description="Log format")
-    output: str = Field(default="stdout", description="Log destination")
 
 
 class Config(BaseModel):
@@ -99,8 +83,6 @@ class Config(BaseModel):
     server: ServerConfig
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     retention: RetentionConfig = Field(default_factory=RetentionConfig)
-    limits: LimitsConfig = Field(default_factory=LimitsConfig)
-    web_ui: WebUIConfig = Field(default_factory=WebUIConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import (
+    Depends,
     FastAPI,
     Header,
     HTTPException,
@@ -77,7 +78,7 @@ async def lifespan(app: FastAPI) -> Any:
 
     # Initialize database
     db_path = config.database.path
-    db = Database(db_path)
+    db = Database(db_path, journal_mode=config.database.journal_mode)
 
     # Initialize WebSocket manager
     ws_manager = WebSocketManager()
@@ -115,18 +116,20 @@ async def lifespan(app: FastAPI) -> Any:
 app = FastAPI(
     title="Argus Event Observability",
     description="Local-network observability platform for development tools",
-    version="0.1.1",
+    version="0.1.2",
     lifespan=lifespan,
 )
 
 
-# API key validation dependency
+# API key validation dependencies
 async def verify_api_key(
+    request: Request,
     x_api_key: str = Header(..., description="API key for authentication"),
 ) -> str:
-    """Validate API key from X-API-Key header.
+    """Validate API key from X-API-Key header (required).
 
     Args:
+        request: FastAPI request for app.state access
         x_api_key: API key from request header
 
     Returns:
@@ -135,13 +138,42 @@ async def verify_api_key(
     Raises:
         HTTPException: 401 if API key is missing or invalid
     """
-    # Access config from app state - get current app instance
-    # Note: This dependency is called within request context, so we can't access app.state directly
-    # We'll need to pass Request to get app.state
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="API key validation requires Request context",
-    )
+    config = request.app.state.config
+    if x_api_key not in config.server.api_keys:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+    return x_api_key
+
+
+async def verify_optional_api_key(
+    request: Request,
+    x_api_key: str | None = Header(
+        None, description="API key for authentication (optional for web UI)"
+    ),
+) -> str | None:
+    """Validate API key if provided (optional for same-origin web UI).
+
+    Args:
+        request: FastAPI request for app.state access
+        x_api_key: API key from request header (optional)
+
+    Returns:
+        Validated API key or None if not provided
+
+    Raises:
+        HTTPException: 401 if API key provided but invalid
+    """
+    if x_api_key is None:
+        return None
+    config = request.app.state.config
+    if x_api_key not in config.server.api_keys:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+    return x_api_key
 
 
 # POST /events endpoint - Event ingestion with API key auth and database storage
@@ -149,14 +181,14 @@ async def verify_api_key(
 async def create_event(
     event: EventCreate,
     request: Request,
-    x_api_key: str = Header(..., description="API key for authentication"),
+    _api_key: str = Depends(verify_api_key),
 ) -> dict[str, Any]:
     """Create event in database with API key authentication.
 
     Args:
         event: Event data (source, event_type required)
         request: FastAPI request for app.state access
-        x_api_key: API key from X-API-Key header
+        _api_key: Validated API key (via dependency)
 
     Returns:
         Success response with event_id
@@ -164,14 +196,6 @@ async def create_event(
     Raises:
         HTTPException: 401 if API key invalid, 422 if schema invalid (automatic)
     """
-    # Validate API key
-    config = request.app.state.config
-    if x_api_key not in config.server.api_keys:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-        )
-
     # Convert EventCreate to dict and generate timestamp if missing
     event_dict = event.model_dump()
     if event_dict.get("timestamp") is None:
@@ -204,9 +228,7 @@ async def create_event(
 @app.get("/events")
 async def query_events(
     request: Request,
-    x_api_key: str | None = Header(
-        None, description="API key for authentication (optional for web UI)"
-    ),
+    _api_key: str | None = Depends(verify_optional_api_key),
     source: str | None = None,
     event_type: str | None = None,
     level: str | None = None,
@@ -218,7 +240,7 @@ async def query_events(
 
     Args:
         request: FastAPI request for app.state access
-        x_api_key: API key from X-API-Key header (optional for same-origin web UI)
+        _api_key: Validated API key or None (via dependency)
         source: Filter by source
         event_type: Filter by event type
         level: Filter by level
@@ -232,14 +254,6 @@ async def query_events(
     Raises:
         HTTPException: 401 if API key provided but invalid, 400 if limit exceeds max
     """
-    # Validate API key if provided (web UI doesn't send API key, external tools do)
-    config = request.app.state.config
-    if x_api_key is not None and x_api_key not in config.server.api_keys:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-        )
-
     # Enforce max limit of 1000
     if limit > 1000:
         raise HTTPException(
@@ -265,15 +279,13 @@ async def query_events(
 @app.get("/sources")
 async def get_sources(
     request: Request,
-    x_api_key: str | None = Header(
-        None, description="API key for authentication (optional for web UI)"
-    ),
+    _api_key: str | None = Depends(verify_optional_api_key),
 ) -> dict[str, Any]:
     """Get list of distinct sources from events.
 
     Args:
         request: FastAPI request for app.state access
-        x_api_key: API key from X-API-Key header (optional for same-origin web UI)
+        _api_key: Validated API key or None (via dependency)
 
     Returns:
         JSON response with sources list
@@ -281,15 +293,6 @@ async def get_sources(
     Raises:
         HTTPException: 401 if API key provided but invalid
     """
-    # Validate API key if provided (web UI doesn't send API key, external tools do)
-    config = request.app.state.config
-    if x_api_key is not None and x_api_key not in config.server.api_keys:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-        )
-
-    # Get distinct sources from database
     db = request.app.state.db
     sources = db.get_sources()
 
@@ -300,15 +303,13 @@ async def get_sources(
 @app.get("/event-types")
 async def get_event_types(
     request: Request,
-    x_api_key: str | None = Header(
-        None, description="API key for authentication (optional for web UI)"
-    ),
+    _api_key: str | None = Depends(verify_optional_api_key),
 ) -> dict[str, Any]:
     """Get list of distinct event types from events.
 
     Args:
         request: FastAPI request for app.state access
-        x_api_key: API key from X-API-Key header (optional for same-origin web UI)
+        _api_key: Validated API key or None (via dependency)
 
     Returns:
         JSON response with event_types list
@@ -316,15 +317,6 @@ async def get_event_types(
     Raises:
         HTTPException: 401 if API key provided but invalid
     """
-    # Validate API key if provided (web UI doesn't send API key, external tools do)
-    config = request.app.state.config
-    if x_api_key is not None and x_api_key not in config.server.api_keys:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API key",
-        )
-
-    # Get distinct event types from database
     db = request.app.state.db
     event_types = db.get_event_types()
 

@@ -47,6 +47,7 @@ function cacheElements() {
   elements.eventsBody = document.getElementById("events-body");
   elements.eventCount = document.getElementById("event-count");
   elements.autoScroll = document.getElementById("auto-scroll");
+  elements.exportBtn = document.getElementById("export-btn");
 
   // Right panel (detail)
   elements.rightPanel = document.getElementById("right-panel");
@@ -153,6 +154,9 @@ function initializeEventListeners() {
   elements.filterSearch.addEventListener("keydown", (e) => {
     if (e.key === "Enter") applyFilters();
   });
+
+  // Export CSV button
+  elements.exportBtn.addEventListener("click", exportCsv);
 }
 
 // WebSocket connection management
@@ -809,4 +813,56 @@ function updateLoadingState(isLoading) {
     elements.eventsBody.classList.remove("loading");
     updateEventCount();
   }
+}
+
+// Export visible events as CSV
+function exportCsv() {
+  const visibleRows = elements.eventsBody.querySelectorAll(
+    '.event-row:not([style*="display: none"])',
+  );
+
+  if (visibleRows.length === 0) {
+    console.warn("No events to export");
+    return;
+  }
+
+  // CSV header
+  const headers = ["Time", "Source", "Project", "Type", "Level", "Message"];
+  const csvRows = [headers.join(",")];
+
+  // Extract data from visible rows
+  visibleRows.forEach((row) => {
+    const cells = row.querySelectorAll("td");
+    const rowData = [
+      cells[0]?.textContent || "", // Time
+      cells[1]?.textContent || "", // Source
+      cells[2]?.textContent || "", // Project
+      cells[3]?.textContent || "", // Type
+      cells[4]?.textContent || "", // Level
+      cells[5]?.textContent || "", // Message
+    ];
+
+    // Escape fields for CSV (quote fields containing commas, quotes, or newlines)
+    const escapedRow = rowData.map((field) => {
+      if (field.includes(",") || field.includes('"') || field.includes("\n")) {
+        return '"' + field.replace(/"/g, '""') + '"';
+      }
+      return field;
+    });
+
+    csvRows.push(escapedRow.join(","));
+  });
+
+  // Create and download CSV file
+  const csvContent = csvRows.join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `argus-events-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.csv`;
+  link.click();
+
+  URL.revokeObjectURL(url);
+  console.log(`Exported ${visibleRows.length} events to CSV`);
 }
