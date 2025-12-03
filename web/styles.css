@@ -430,10 +430,11 @@ button:hover {
 }
 
 /* Column Widths */
-.col-time { width: 80px; }
-.col-source { width: 120px; }
-.col-type { width: 140px; }
-.col-level { width: 70px; }
+.col-time { width: 70px; }
+.col-source { width: 100px; }
+.col-project { width: 100px; }
+.col-type { width: 120px; }
+.col-level { width: 60px; }
 .col-message { width: auto; }
 
 .event-row {

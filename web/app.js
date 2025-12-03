@@ -241,9 +241,13 @@ function renderEvent(event) {
   const displayMessage =
     message.length > 80 ? message.substring(0, 77) + "..." : message;
 
+  // Extract project from data payload if available
+  const project = event.data?.project || "-";
+
   row.innerHTML = `
     <td class="time">${timestamp}</td>
     <td class="source"><span class="source-badge">${escapeHtml(event.source)}</span></td>
+    <td class="project">${escapeHtml(project)}</td>
     <td class="type">${escapeHtml(event.event_type)}</td>
     <td class="level">${levelBadge}</td>
     <td class="message">${escapeHtml(displayMessage)}</td>
