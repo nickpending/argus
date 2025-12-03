@@ -22,6 +22,8 @@ const state = {
   currentTimeRange: "all", // "all", "1h", "24h", "7d", "custom"
   eventCount: 0,
   selectedEventId: null,
+  knownEventIds: new Set(), // Track rendered event IDs for deduplication
+  isLoadingHistory: false, // Loading state for historical fetch
 };
 
 // DOM element references (cached on load)
@@ -263,7 +265,18 @@ function handleSubscribeResult(message) {
 
 // Handle event message
 function handleEvent(message) {
-  renderEvent(message.event);
+  const event = message.event;
+
+  // Deduplicate: skip if we already have this event
+  if (state.knownEventIds.has(event.id)) {
+    return;
+  }
+
+  // Track the event ID
+  state.knownEventIds.add(event.id);
+
+  // Render the event (filter check happens in renderEvent)
+  renderEvent(event);
 }
 
 // Render event to table
@@ -505,8 +518,15 @@ function getTimeRange() {
 function applyFilters() {
   const filters = collectFilters();
   state.currentFilters = filters;
-  filterTableRows(filters);
-  updateEventCount();
+
+  // If time range filter is active, fetch historical events from API
+  if (filters.time_since || filters.time_until) {
+    fetchHistoricalEvents(filters);
+  } else {
+    // No time filter - just filter existing DOM rows
+    filterTableRows(filters);
+    updateEventCount();
+  }
 }
 
 // Clear all filters
@@ -632,5 +652,134 @@ async function loadSourceOptions() {
     console.log(`Loaded ${sources.length} sources for filter dropdown`);
   } catch (error) {
     console.error("Error loading sources:", error);
+  }
+}
+
+// Fetch historical events from API based on current filters
+async function fetchHistoricalEvents(filters) {
+  if (state.isLoadingHistory) {
+    return; // Prevent concurrent fetches
+  }
+
+  state.isLoadingHistory = true;
+  updateLoadingState(true);
+
+  try {
+    // Build query parameters
+    const params = new URLSearchParams();
+
+    if (filters.source) {
+      params.append("source", filters.source);
+    }
+    if (filters.event_type) {
+      params.append("event_type", filters.event_type);
+    }
+    if (filters.levels && filters.levels.length === 1) {
+      // API only supports single level filter
+      params.append("level", filters.levels[0]);
+    }
+    if (filters.time_since) {
+      params.append("since", filters.time_since);
+    }
+    if (filters.time_until) {
+      params.append("until", filters.time_until);
+    }
+    params.append("limit", "500"); // Fetch more for historical view
+
+    const url = `/events?${params.toString()}`;
+    console.log("Fetching historical events:", url);
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      console.error("Failed to fetch events:", response.status);
+      return;
+    }
+
+    const data = await response.json();
+    const events = data.events || [];
+
+    // Clear existing events and reset tracking
+    clearEventsTable();
+    state.knownEventIds.clear();
+    state.eventCount = 0;
+
+    // Render events (API returns newest first, so reverse for insertion)
+    // Since renderEvent inserts at top, we render oldest first
+    const reversedEvents = [...events].reverse();
+    reversedEvents.forEach((event) => {
+      state.knownEventIds.add(event.id);
+      renderEventWithoutFilter(event); // Render without filter check (already filtered by API)
+    });
+
+    // Apply client-side filters for levels and search (API doesn't support these fully)
+    filterTableRows(filters);
+    updateEventCount();
+
+    console.log(`Loaded ${events.length} historical events`);
+  } catch (error) {
+    console.error("Error fetching historical events:", error);
+  } finally {
+    state.isLoadingHistory = false;
+    updateLoadingState(false);
+  }
+}
+
+// Clear all events from table
+function clearEventsTable() {
+  elements.eventsBody.innerHTML = "";
+  state.eventCount = 0;
+  state.selectedEventId = null;
+  elements.rightPanel.classList.remove("has-selection");
+}
+
+// Render event without applying filter check (for historical events already filtered by API)
+function renderEventWithoutFilter(event) {
+  const row = document.createElement("tr");
+  row.className = "event-row";
+  row.dataset.eventId = event.id;
+  row.dataset.timestamp = event.timestamp;
+  if (event.level) {
+    row.dataset.level = event.level;
+  }
+
+  const timestamp = formatTimestamp(event.timestamp);
+  const level = event.level || "debug";
+  const levelText = event.level || "-";
+  const levelBadge = `<span class="level-badge ${escapeHtml(level)}">${escapeHtml(levelText)}</span>`;
+
+  const message = event.message || "-";
+  const displayMessage =
+    message.length > 80 ? message.substring(0, 77) + "..." : message;
+
+  const project = event.data?.project || "-";
+
+  row.innerHTML = `
+    <td class="time">${timestamp}</td>
+    <td class="source"><span class="source-badge">${escapeHtml(event.source)}</span></td>
+    <td class="project">${escapeHtml(project)}</td>
+    <td class="type">${escapeHtml(event.event_type)}</td>
+    <td class="level">${levelBadge}</td>
+    <td class="message">${escapeHtml(displayMessage)}</td>
+  `;
+
+  // Click handler for detail panel
+  row.addEventListener("click", () => {
+    showEventDetail(event, row);
+  });
+
+  // Insert at top (newest first)
+  elements.eventsBody.insertBefore(row, elements.eventsBody.firstChild);
+  state.eventCount++;
+}
+
+// Update loading state indicator
+function updateLoadingState(isLoading) {
+  if (isLoading) {
+    elements.eventCount.textContent = "Loading...";
+    elements.eventsBody.classList.add("loading");
+  } else {
+    elements.eventsBody.classList.remove("loading");
+    updateEventCount();
   }
 }
