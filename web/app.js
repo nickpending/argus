@@ -4,10 +4,9 @@
 // Configuration
 const CONFIG = {
   wsUrl: `ws://${window.location.host}/ws`,
-  // No API key required - web UI uses same-origin authentication
   reconnect: {
-    initialDelay: 5000, // 5 seconds
-    maxDelay: 60000, // 60 seconds
+    initialDelay: 5000,
+    maxDelay: 60000,
     backoffMultiplier: 2,
   },
 };
@@ -15,11 +14,13 @@ const CONFIG = {
 // Connection state
 const state = {
   ws: null,
-  connectionState: "disconnected", // disconnected | connecting | connected
+  connectionState: "disconnected",
   reconnectDelay: CONFIG.reconnect.initialDelay,
   reconnectTimer: null,
   authenticated: false,
   currentFilters: {},
+  eventCount: 0,
+  selectedEventId: null,
 };
 
 // DOM element references (cached on load)
@@ -35,12 +36,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Cache DOM element references
 function cacheElements() {
+  // Status
   elements.statusDot = document.getElementById("status-dot");
   elements.statusText = document.getElementById("status-text");
+
+  // Events
   elements.eventsBody = document.getElementById("events-body");
+  elements.eventCount = document.getElementById("event-count");
   elements.autoScroll = document.getElementById("auto-scroll");
+
+  // Right panel (detail)
+  elements.rightPanel = document.getElementById("right-panel");
   elements.detailPanel = document.getElementById("detail-panel");
   elements.detailClose = document.getElementById("detail-close");
+  elements.detailEmpty = document.getElementById("detail-empty");
+  elements.detailView = document.getElementById("detail-view");
   elements.detailId = document.getElementById("detail-id");
   elements.detailSource = document.getElementById("detail-source");
   elements.detailType = document.getElementById("detail-type");
@@ -48,9 +58,9 @@ function cacheElements() {
   elements.detailLevel = document.getElementById("detail-level");
   elements.detailMessage = document.getElementById("detail-message");
   elements.detailDataJson = document.getElementById("detail-data-json");
-  // Filter panel elements
-  elements.filterPanel = document.getElementById("filter-panel");
-  elements.filterToggle = document.getElementById("filter-toggle");
+
+  // Left panel (filters)
+  elements.leftPanel = document.getElementById("left-panel");
   elements.filterSource = document.getElementById("filter-source");
   elements.filterType = document.getElementById("filter-type");
   elements.filterSearch = document.getElementById("filter-search");
@@ -63,19 +73,20 @@ function cacheElements() {
 function initializeEventListeners() {
   // Detail panel close button
   elements.detailClose.addEventListener("click", () => {
-    elements.detailPanel.classList.remove("open");
+    hideEventDetail();
   });
 
-  // Filter panel toggle button
-  elements.filterToggle.addEventListener("click", () => {
-    elements.filterPanel.classList.toggle("open");
+  // Close detail on ESC key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && state.selectedEventId) {
+      hideEventDetail();
+    }
   });
 
   // Level chip toggle buttons (auto-apply on click)
   elements.levelChips.forEach((chip) => {
     chip.addEventListener("click", () => {
       chip.classList.toggle("active");
-      // Auto-apply filters when chip toggled
       applyFilters();
     });
   });
@@ -88,6 +99,14 @@ function initializeEventListeners() {
   // Filter clear button
   elements.filterClear.addEventListener("click", () => {
     clearFilters();
+  });
+
+  // Apply filters on Enter key in text inputs
+  elements.filterType.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") applyFilters();
+  });
+  elements.filterSearch.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") applyFilters();
   });
 }
 
@@ -116,8 +135,6 @@ function connect() {
 // Handle WebSocket open
 function handleOpen() {
   console.log("WebSocket connected");
-
-  // Send auth message immediately
   sendAuth();
 }
 
@@ -126,7 +143,6 @@ function handleMessage(event) {
   try {
     const message = JSON.parse(event.data);
 
-    // Route by message type
     switch (message.type) {
       case "auth_result":
         handleAuthResult(message);
@@ -141,7 +157,6 @@ function handleMessage(event) {
         console.error("WebSocket error:", message.message);
         break;
       case "pong":
-        // Heartbeat response (optional feature)
         break;
       default:
         console.warn("Unknown message type:", message.type);
@@ -159,7 +174,6 @@ function handleClose(event) {
   state.authenticated = false;
   updateStatus("disconnected", "Disconnected");
 
-  // Attempt reconnection
   scheduleReconnect();
 }
 
@@ -170,12 +184,7 @@ function handleError(error) {
 
 // Send authentication message
 function sendAuth() {
-  const authMessage = {
-    type: "auth",
-    // Web UI uses same-origin authentication, no API key needed
-  };
-
-  send(authMessage);
+  send({ type: "auth" });
 }
 
 // Handle authentication result
@@ -183,12 +192,10 @@ function handleAuthResult(message) {
   if (message.status === "success") {
     state.authenticated = true;
     state.connectionState = "connected";
-    state.reconnectDelay = CONFIG.reconnect.initialDelay; // Reset backoff
+    state.reconnectDelay = CONFIG.reconnect.initialDelay;
     updateStatus("connected", "Connected");
 
     console.log("WebSocket authenticated successfully");
-
-    // Subscribe to all events initially (empty filters)
     subscribe({});
   } else {
     console.error("Authentication failed:", message.message);
@@ -198,13 +205,8 @@ function handleAuthResult(message) {
 
 // Send subscribe message
 function subscribe(filters) {
-  const subscribeMessage = {
-    type: "subscribe",
-    filters: filters,
-  };
-
   state.currentFilters = filters;
-  send(subscribeMessage);
+  send({ type: "subscribe", filters: filters });
 }
 
 // Handle subscribe result
@@ -218,10 +220,7 @@ function handleSubscribeResult(message) {
 
 // Handle event message
 function handleEvent(message) {
-  const event = message.event;
-
-  // Render event to table
-  renderEvent(event);
+  renderEvent(message.event);
 }
 
 // Render event to table
@@ -233,31 +232,26 @@ function renderEvent(event) {
     row.dataset.level = event.level;
   }
 
-  // Format timestamp
   const timestamp = formatTimestamp(event.timestamp);
-
-  // Format level badge (null level = debug)
   const level = event.level || "debug";
   const levelText = event.level || "-";
-  // Escape both class name and display text to prevent XSS
   const levelBadge = `<span class="level-badge ${escapeHtml(level)}">${escapeHtml(levelText)}</span>`;
 
-  // Truncate message for table display
   const message = event.message || "-";
   const displayMessage =
-    message.length > 60 ? message.substring(0, 57) + "..." : message;
+    message.length > 80 ? message.substring(0, 77) + "..." : message;
 
   row.innerHTML = `
-        <td class="time">${timestamp}</td>
-        <td class="source"><span class="source-badge">${escapeHtml(event.source)}</span></td>
-        <td class="type">${escapeHtml(event.event_type)}</td>
-        <td class="level">${levelBadge}</td>
-        <td class="message">${escapeHtml(displayMessage)}</td>
-    `;
+    <td class="time">${timestamp}</td>
+    <td class="source"><span class="source-badge">${escapeHtml(event.source)}</span></td>
+    <td class="type">${escapeHtml(event.event_type)}</td>
+    <td class="level">${levelBadge}</td>
+    <td class="message">${escapeHtml(displayMessage)}</td>
+  `;
 
-  // Add click handler for detail panel
+  // Click handler for detail panel
   row.addEventListener("click", () => {
-    showEventDetail(event);
+    showEventDetail(event, row);
   });
 
   // Check if row matches current filters
@@ -266,17 +260,34 @@ function renderEvent(event) {
     row.style.display = "none";
   }
 
-  // Insert at top of table (newest first)
+  // Insert at top (newest first)
   elements.eventsBody.insertBefore(row, elements.eventsBody.firstChild);
 
-  // Auto-scroll if enabled (only for visible rows)
+  // Update count
+  state.eventCount++;
+  updateEventCount();
+
+  // Auto-scroll if enabled
   if (elements.autoScroll.checked && matchesFilter) {
     row.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 }
 
 // Show event detail panel
-function showEventDetail(event) {
+function showEventDetail(event, row) {
+  // Remove selection from previous row
+  const previouslySelected = elements.eventsBody.querySelector(
+    ".event-row.selected",
+  );
+  if (previouslySelected) {
+    previouslySelected.classList.remove("selected");
+  }
+
+  // Mark new row as selected
+  row.classList.add("selected");
+  state.selectedEventId = event.id;
+
+  // Populate detail fields
   elements.detailId.textContent = event.id;
   elements.detailSource.textContent = event.source;
   elements.detailType.textContent = event.event_type;
@@ -291,19 +302,28 @@ function showEventDetail(event) {
     elements.detailDataJson.textContent = "null";
   }
 
-  // Show panel
-  elements.detailPanel.classList.add("open");
+  // Show detail view
+  elements.rightPanel.classList.add("has-selection");
+}
+
+// Hide event detail panel
+function hideEventDetail() {
+  // Remove row selection
+  const selectedRow = elements.eventsBody.querySelector(".event-row.selected");
+  if (selectedRow) {
+    selectedRow.classList.remove("selected");
+  }
+
+  state.selectedEventId = null;
+  elements.rightPanel.classList.remove("has-selection");
 }
 
 // Format timestamp for display
 function formatTimestamp(isoTimestamp) {
   const date = new Date(isoTimestamp);
-
-  // Format as HH:MM:SS
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const seconds = String(date.getSeconds()).padStart(2, "0");
-
   return `${hours}:${minutes}:${seconds}`;
 }
 
@@ -315,9 +335,23 @@ function escapeHtml(text) {
 }
 
 // Update connection status indicator
-function updateStatus(state, text) {
-  elements.statusDot.className = `status-dot ${state}`;
+function updateStatus(statusState, text) {
+  elements.statusDot.className = `status-dot ${statusState}`;
   elements.statusText.textContent = text;
+}
+
+// Update event count display
+function updateEventCount() {
+  const visible = elements.eventsBody.querySelectorAll(
+    '.event-row:not([style*="display: none"])',
+  ).length;
+  const total = state.eventCount;
+
+  if (visible === total) {
+    elements.eventCount.textContent = `${total} events`;
+  } else {
+    elements.eventCount.textContent = `${visible} / ${total} events`;
+  }
 }
 
 // Send message to WebSocket
@@ -331,7 +365,6 @@ function send(message) {
 
 // Schedule reconnection with exponential backoff
 function scheduleReconnect() {
-  // Clear existing timer
   if (state.reconnectTimer) {
     clearTimeout(state.reconnectTimer);
   }
@@ -340,8 +373,6 @@ function scheduleReconnect() {
 
   state.reconnectTimer = setTimeout(() => {
     connect();
-
-    // Increase backoff for next attempt
     state.reconnectDelay = Math.min(
       state.reconnectDelay * CONFIG.reconnect.backoffMultiplier,
       CONFIG.reconnect.maxDelay,
@@ -353,32 +384,24 @@ function scheduleReconnect() {
 function collectFilters() {
   const filters = {};
 
-  // Source filter (dropdown)
   const source = elements.filterSource.value.trim();
   if (source) {
     filters.source = source;
   }
 
-  // Event type filter (comma-separated text input)
   const eventType = elements.filterType.value.trim();
   if (eventType) {
     filters.event_type = eventType;
   }
 
-  // Level filter (active chips = visible levels)
   const activeLevels = Array.from(elements.levelChips)
     .filter((chip) => chip.classList.contains("active"))
     .map((chip) => chip.dataset.level);
 
-  // Always apply level filter
-  // If all active (4 chips), omit filter = show all
-  // If some active, filter to those levels
-  // If none active, empty array = hide all
   if (activeLevels.length < 4) {
     filters.levels = activeLevels;
   }
 
-  // Search filter (message contains text)
   const search = elements.filterSearch.value.trim();
   if (search) {
     filters.search = search;
@@ -387,41 +410,30 @@ function collectFilters() {
   return filters;
 }
 
-// Apply current filters (CLIENT-SIDE - show/hide rows)
+// Apply current filters
 function applyFilters() {
   const filters = collectFilters();
-
-  // Store current filters for newly arriving events
   state.currentFilters = filters;
-
-  // Filter existing table rows
   filterTableRows(filters);
+  updateEventCount();
 }
 
 // Clear all filters
 function clearFilters() {
-  // Reset source dropdown
   elements.filterSource.value = "";
-
-  // Reset event type input
   elements.filterType.value = "";
-
-  // Reset search input
   elements.filterSearch.value = "";
 
-  // Activate all level chips (show all levels)
   elements.levelChips.forEach((chip) => {
     chip.classList.add("active");
   });
 
-  // Clear stored filters
   state.currentFilters = {};
-
-  // Show all rows
   filterTableRows({});
+  updateEventCount();
 }
 
-// Filter table rows client-side (show/hide based on criteria)
+// Filter table rows client-side
 function filterTableRows(filters) {
   const rows = elements.eventsBody.querySelectorAll(".event-row");
 
@@ -433,12 +445,10 @@ function filterTableRows(filters) {
 
 // Check if row matches filter criteria
 function rowMatchesFilter(row, filters) {
-  // No filters = show all
   if (Object.keys(filters).length === 0) {
     return true;
   }
 
-  // Extract row data from DOM
   const sourceCell = row.querySelector(".source .source-badge");
   const typeCell = row.querySelector(".type");
   const levelCell = row.querySelector(".level .level-badge");
@@ -451,30 +461,24 @@ function rowMatchesFilter(row, filters) {
     message: messageCell ? messageCell.textContent.trim() : "",
   };
 
-  // Check source filter
   if (filters.source && rowData.source !== filters.source) {
     return false;
   }
 
-  // Check event_type filter
   if (filters.event_type && rowData.event_type !== filters.event_type) {
     return false;
   }
 
-  // Check level filter (OR logic - show if matches ANY active level)
   if (filters.levels !== undefined) {
-    // If empty array, hide all (no levels selected)
     if (filters.levels.length === 0) {
       return false;
     }
-    // Events with no level show as "-" in badge, treat as debug level
     const eventLevel = rowData.level === "-" ? "debug" : rowData.level;
     if (!filters.levels.includes(eventLevel)) {
       return false;
     }
   }
 
-  // Check search filter (message contains text)
   if (filters.search) {
     const searchLower = filters.search.toLowerCase();
     if (!rowData.message.toLowerCase().includes(searchLower)) {
@@ -488,7 +492,6 @@ function rowMatchesFilter(row, filters) {
 // Load source options from API
 async function loadSourceOptions() {
   try {
-    // No API key needed for same-origin requests
     const response = await fetch("/sources");
 
     if (!response.ok) {
@@ -499,7 +502,6 @@ async function loadSourceOptions() {
     const data = await response.json();
     const sources = data.sources || [];
 
-    // Populate dropdown
     sources.forEach((source) => {
       const option = document.createElement("option");
       option.value = source;

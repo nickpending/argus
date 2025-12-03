@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Argus - Event Observability</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -20,7 +23,6 @@
                     Auto-scroll
                 </label>
             </div>
-            <button class="filter-toggle" id="filter-toggle">Filters</button>
             <button class="export-btn" id="export-btn">Export CSV</button>
             <div class="status-indicator">
                 <span class="status-dot disconnected" id="status-dot"></span>
@@ -29,96 +31,111 @@
         </div>
     </header>
 
-    <!-- Main Container with Grid Background -->
+    <!-- Three-Panel Layout -->
     <main class="main-container">
-        <!-- Events Table -->
-        <div class="table-wrapper">
-            <table class="events-table">
-                <thead>
-                    <tr>
-                        <th class="col-time">Time</th>
-                        <th class="col-source">Source</th>
-                        <th class="col-type">Event Type</th>
-                        <th class="col-level">Lvl</th>
-                        <th class="col-message">Message</th>
-                    </tr>
-                </thead>
-                <tbody id="events-body">
-                    <!-- Event rows will be inserted here by JavaScript -->
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Detail Panel (Hidden by default) -->
-        <div class="detail-panel" id="detail-panel">
-            <div class="detail-header">
-                <h2>Event #<span id="detail-id">—</span></h2>
-                <button class="close-btn" id="detail-close">×</button>
+        <!-- Left Panel: Filters -->
+        <aside class="panel left-panel" id="left-panel">
+            <div class="panel-header">
+                <h2>Filters</h2>
             </div>
+            <div class="panel-content">
+                <div class="filter-group">
+                    <label for="filter-source">Source</label>
+                    <select id="filter-source">
+                        <option value="">All Sources</option>
+                    </select>
+                </div>
 
-            <div class="detail-content">
-                <dl class="detail-fields">
-                    <dt>Source</dt>
-                    <dd id="detail-source">—</dd>
+                <div class="filter-group">
+                    <label for="filter-type">Event Type</label>
+                    <input type="text" id="filter-type" placeholder="e.g. thinking, tool_use">
+                </div>
 
-                    <dt>Event Type</dt>
-                    <dd id="detail-type">—</dd>
+                <div class="filter-group">
+                    <label>Level</label>
+                    <div class="level-chips">
+                        <button class="chip active" data-level="debug">Debug</button>
+                        <button class="chip active" data-level="info">Info</button>
+                        <button class="chip active" data-level="warn">Warn</button>
+                        <button class="chip active" data-level="error">Error</button>
+                    </div>
+                </div>
 
-                    <dt>Timestamp</dt>
-                    <dd id="detail-timestamp">—</dd>
+                <div class="filter-group">
+                    <label for="filter-search">Search Message</label>
+                    <input type="text" id="filter-search" placeholder="Search in messages...">
+                </div>
 
-                    <dt>Level</dt>
-                    <dd id="detail-level">—</dd>
-
-                    <dt>Message</dt>
-                    <dd id="detail-message">—</dd>
-                </dl>
-
-                <div class="detail-data">
-                    <h3>Data</h3>
-                    <pre id="detail-data-json">{}</pre>
+                <div class="filter-actions">
+                    <button class="apply-btn" id="filter-apply">Apply</button>
+                    <button class="clear-btn" id="filter-clear">Clear</button>
                 </div>
             </div>
-        </div>
-    </main>
+        </aside>
 
-    <!-- Filter Panel (Hidden by default, slides in from right) -->
-    <aside class="filter-panel" id="filter-panel">
-        <h2>Filters</h2>
-
-        <div class="filter-group">
-            <label for="filter-source">Source</label>
-            <select id="filter-source">
-                <option value="">All Sources</option>
-                <!-- Options populated dynamically from /sources endpoint -->
-            </select>
-        </div>
-
-        <div class="filter-group">
-            <label for="filter-type">Event Type</label>
-            <input type="text" id="filter-type" placeholder="thinking, tool_use, ...">
-        </div>
-
-        <div class="filter-group">
-            <label>Level</label>
-            <div class="level-chips">
-                <button class="chip active" data-level="debug">Debug</button>
-                <button class="chip active" data-level="info">Info</button>
-                <button class="chip active" data-level="warn">Warn</button>
-                <button class="chip active" data-level="error">Error</button>
+        <!-- Center Panel: Events -->
+        <section class="panel center-panel" id="center-panel">
+            <div class="panel-header">
+                <h2>Events</h2>
+                <span class="event-count" id="event-count">0 events</span>
             </div>
-        </div>
+            <div class="panel-content events-container">
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th class="col-time">Time</th>
+                            <th class="col-source">Source</th>
+                            <th class="col-type">Type</th>
+                            <th class="col-level">Lvl</th>
+                            <th class="col-message">Message</th>
+                        </tr>
+                    </thead>
+                    <tbody id="events-body">
+                        <!-- Event rows inserted by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
 
-        <div class="filter-group">
-            <label for="filter-search">Search Message</label>
-            <input type="text" id="filter-search" placeholder="Search in messages...">
-        </div>
+        <!-- Right Panel: Event Detail -->
+        <aside class="panel right-panel" id="right-panel">
+            <div class="panel-header">
+                <h2>Event Detail</h2>
+                <button class="close-btn" id="detail-close" title="Close">&times;</button>
+            </div>
+            <div class="panel-content" id="detail-panel">
+                <div class="detail-empty" id="detail-empty">
+                    <p>Select an event to view details</p>
+                </div>
+                <div class="detail-view" id="detail-view">
+                    <dl class="detail-fields">
+                        <dt>ID</dt>
+                        <dd id="detail-id">-</dd>
 
-        <div class="filter-actions">
-            <button class="apply-btn" id="filter-apply">Apply</button>
-            <button class="clear-btn" id="filter-clear">Clear All</button>
-        </div>
-    </aside>
+                        <dt>Source</dt>
+                        <dd id="detail-source">-</dd>
+
+                        <dt>Type</dt>
+                        <dd id="detail-type">-</dd>
+
+                        <dt>Timestamp</dt>
+                        <dd id="detail-timestamp">-</dd>
+
+                        <dt>Level</dt>
+                        <dd id="detail-level">-</dd>
+
+                        <dt>Message</dt>
+                        <dd id="detail-message">-</dd>
+                    </dl>
+
+                    <div class="detail-data">
+                        <h3>Data</h3>
+                        <pre id="detail-data-json">{}</pre>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
 
     <script src="app.js"></script>
 </body>
