@@ -18,7 +18,7 @@ def test_api_key_blocks_unauthenticated(client: TestClient) -> None:
     """
     event_data = {
         "source": "test-app",
-        "event_type": "test.event",
+        "event_type": "tool",
         "message": "Test event without authentication",
     }
 
@@ -38,7 +38,7 @@ def test_invalid_api_key_returns_401(client: TestClient) -> None:
     """
     event_data = {
         "source": "test-app",
-        "event_type": "test.event",
+        "event_type": "tool",
         "message": "Test event with wrong API key",
     }
 
@@ -63,7 +63,7 @@ def test_post_success_guarantees_persistence(client: TestClient, test_config: Co
     """
     event_data = {
         "source": "critical-app",
-        "event_type": "payment.completed",
+        "event_type": "response",
         "message": "Payment processed",
         "data": {"amount": 99.99, "currency": "USD"},
     }
@@ -90,7 +90,7 @@ def test_post_success_guarantees_persistence(client: TestClient, test_config: Co
     stored_event = events[0]
     assert stored_event["id"] == event_id
     assert stored_event["source"] == "critical-app"
-    assert stored_event["event_type"] == "payment.completed"
+    assert stored_event["event_type"] == "response"
     assert stored_event["data"]["amount"] == 99.99
 
 
@@ -103,7 +103,7 @@ def test_event_id_uniqueness(client: TestClient) -> None:
     """
     event_template = {
         "source": "test-app",
-        "event_type": "id.test",
+        "event_type": "tool",
         "message": "Testing ID uniqueness",
     }
 

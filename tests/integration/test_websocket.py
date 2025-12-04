@@ -24,7 +24,7 @@ def test_unauthenticated_client_receives_no_events(client: TestClient) -> None:
         # Post event via HTTP API
         response = client.post(
             "/events",
-            json={"source": "test", "event_type": "secret", "message": "Sensitive"},
+            json={"source": "test", "event_type": "session", "message": "Sensitive"},
             headers={"X-API-Key": "test-key-1"},
         )
         assert response.status_code == 201
@@ -83,7 +83,7 @@ def test_filter_and_logic_prevents_leakage(client: TestClient) -> None:
         websocket.send_json(
             {
                 "type": "subscribe",
-                "filters": {"source": "app-a", "event_type": "critical"},
+                "filters": {"source": "app-a", "event_type": "agent"},
             }
         )
         subscribe_response = websocket.receive_json()
@@ -93,17 +93,17 @@ def test_filter_and_logic_prevents_leakage(client: TestClient) -> None:
         test_cases = [
             {
                 "source": "app-a",
-                "event_type": "critical",
+                "event_type": "agent",
                 "should_receive": True,
             },  # Match both
             {
                 "source": "app-a",
-                "event_type": "info",
+                "event_type": "tool",
                 "should_receive": False,
             },  # Wrong event_type
             {
                 "source": "app-b",
-                "event_type": "critical",
+                "event_type": "agent",
                 "should_receive": False,
             },  # Wrong source
         ]
@@ -133,7 +133,7 @@ def test_filter_and_logic_prevents_leakage(client: TestClient) -> None:
 
         # Verify the event matches our filter
         assert received_event["source"] == "app-a"
-        assert received_event["event_type"] == "critical"
+        assert received_event["event_type"] == "agent"
 
 
 def test_empty_filters_receive_all_events(client: TestClient) -> None:
@@ -156,9 +156,9 @@ def test_empty_filters_receive_all_events(client: TestClient) -> None:
 
         # Post events with different sources and types
         test_events = [
-            {"source": "app-1", "event_type": "type_a"},
-            {"source": "app-2", "event_type": "type_b"},
-            {"source": "app-3", "event_type": "type_c"},
+            {"source": "app-1", "event_type": "tool"},
+            {"source": "app-2", "event_type": "session"},
+            {"source": "app-3", "event_type": "agent"},
         ]
 
         for event_data in test_events:
@@ -214,7 +214,7 @@ def test_disconnected_clients_removed(client: TestClient) -> None:
             "/events",
             json={
                 "source": "cleanup-test",
-                "event_type": "after_disconnect",
+                "event_type": "prompt",
                 "message": "After client 1 disconnected",
             },
             headers={"X-API-Key": "test-key-1"},
@@ -260,7 +260,7 @@ def test_broadcast_reaches_all_matching_clients(client: TestClient) -> None:
             "/events",
             json={
                 "source": "broadcast-test",
-                "event_type": "test",
+                "event_type": "response",
                 "message": "Should be received",
             },
             headers={"X-API-Key": "test-key-1"},

@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ServerConfig(BaseModel):
@@ -96,15 +96,18 @@ class EventCreate(BaseModel):
     Timestamp auto-generated if not provided.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     source: str = Field(
         ..., min_length=1, max_length=50, description="Producing application identifier"
     )
-    event_type: str = Field(..., min_length=1, max_length=50, description="Event category")
+    event_type: Literal["tool", "session", "agent", "response", "prompt"] = Field(
+        ..., description="Event category"
+    )
     timestamp: str | None = Field(default=None, description="ISO8601 timestamp (UTC with Z suffix)")
     message: str | None = Field(
         default=None, max_length=2000, description="Human-readable description"
     )
-    level: str | None = Field(default=None, description="Log level (debug/info/warn/error)")
     data: dict[str, Any] | None = Field(default=None, description="Arbitrary JSON data")
 
     # Agent observability fields (all optional for backwards compatibility)
@@ -142,31 +145,6 @@ class EventCreate(BaseModel):
             raise ValueError(
                 "source must start with lowercase letter and contain only lowercase letters, numbers, and hyphens"
             )
-        return v
-
-    @field_validator("event_type")
-    @classmethod
-    def validate_event_type_pattern(cls, v: str) -> str:
-        """Validate event_type matches pattern: lowercase start, alphanumeric + underscores/dots."""
-        v = v.strip()
-        if not v:
-            raise ValueError("event_type must not be empty")
-        if not re.match(r"^[a-z][a-z0-9_.]*$", v):
-            raise ValueError(
-                "event_type must start with lowercase letter and contain only lowercase letters, numbers, underscores, and dots"
-            )
-        return v
-
-    @field_validator("level")
-    @classmethod
-    def validate_level_enum(cls, v: str | None) -> str | None:
-        """Validate level is a valid log level if provided."""
-        if v is None:
-            return None
-        v = v.strip().lower()
-        valid_levels = {"debug", "info", "warn", "error"}
-        if v not in valid_levels:
-            raise ValueError(f"level must be one of {valid_levels} or None")
         return v
 
     @field_validator("timestamp")

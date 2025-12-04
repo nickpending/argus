@@ -103,10 +103,10 @@ def test_source_filter_returns_only_matching_events(client: TestClient) -> None:
     """
     # Create events with different sources
     test_events = [
-        {"source": "app-a", "event_type": "test", "message": "From app-a"},
-        {"source": "app-b", "event_type": "test", "message": "From app-b"},
-        {"source": "app-a", "event_type": "test", "message": "Another from app-a"},
-        {"source": "app-c", "event_type": "test", "message": "From app-c"},
+        {"source": "app-a", "event_type": "tool", "message": "From app-a"},
+        {"source": "app-b", "event_type": "tool", "message": "From app-b"},
+        {"source": "app-a", "event_type": "tool", "message": "Another from app-a"},
+        {"source": "app-c", "event_type": "tool", "message": "From app-c"},
     ]
 
     for event in test_events:
@@ -142,9 +142,9 @@ def test_discovery_endpoints_return_complete_sorted_lists(client: TestClient) ->
     """
     # Create events with multiple sources and types
     test_events = [
-        {"source": "zebra", "event_type": "type_z", "message": "Test Z"},
-        {"source": "alpha", "event_type": "type_a", "message": "Test A"},
-        {"source": "beta", "event_type": "type_b", "message": "Test B"},
+        {"source": "zebra", "event_type": "session", "message": "Test Z"},
+        {"source": "alpha", "event_type": "agent", "message": "Test A"},
+        {"source": "beta", "event_type": "prompt", "message": "Test B"},
     ]
 
     for event in test_events:
@@ -177,12 +177,12 @@ def test_discovery_endpoints_return_complete_sorted_lists(client: TestClient) ->
     event_types = response.json()["event_types"]
 
     # Verify all types present
-    assert "type_a" in event_types
-    assert "type_b" in event_types
-    assert "type_z" in event_types
+    assert "agent" in event_types
+    assert "prompt" in event_types
+    assert "session" in event_types
 
     # Verify alphabetically sorted
-    type_a_idx = event_types.index("type_a")
-    type_b_idx = event_types.index("type_b")
-    type_z_idx = event_types.index("type_z")
-    assert type_a_idx < type_b_idx < type_z_idx
+    agent_idx = event_types.index("agent")
+    prompt_idx = event_types.index("prompt")
+    session_idx = event_types.index("session")
+    assert agent_idx < prompt_idx < session_idx
