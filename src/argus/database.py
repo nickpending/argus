@@ -209,6 +209,11 @@ class Database:
         since: str | None = None,
         until: str | None = None,
         limit: int = 100,
+        session_id: str | None = None,
+        hook: str | None = None,
+        tool_name: str | None = None,
+        status: str | None = None,
+        agent_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Query events with optional filtering.
 
@@ -219,6 +224,11 @@ class Database:
             since: Filter events after this timestamp (ISO8601)
             until: Filter events before this timestamp (ISO8601)
             limit: Maximum number of events to return (default 100)
+            session_id: Filter by session ID
+            hook: Filter by hook type
+            tool_name: Filter by tool name
+            status: Filter by status (success/failure/pending)
+            agent_id: Filter by agent ID
 
         Returns:
             List of event dictionaries with deserialized data
@@ -242,6 +252,21 @@ class Database:
         if until is not None:
             where_clauses.append("timestamp <= ?")
             params.append(until)
+        if session_id is not None:
+            where_clauses.append("session_id = ?")
+            params.append(session_id)
+        if hook is not None:
+            where_clauses.append("hook = ?")
+            params.append(hook)
+        if tool_name is not None:
+            where_clauses.append("tool_name = ?")
+            params.append(tool_name)
+        if status is not None:
+            where_clauses.append("status = ?")
+            params.append(status)
+        if agent_id is not None:
+            where_clauses.append("agent_id = ?")
+            params.append(agent_id)
 
         # Build query with parameterized values only
         base_query = (

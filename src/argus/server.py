@@ -12,6 +12,7 @@ from fastapi import (
     FastAPI,
     Header,
     HTTPException,
+    Query,
     Request,
     WebSocket,
     WebSocketDisconnect,
@@ -235,6 +236,11 @@ async def query_events(
     since: str | None = None,
     until: str | None = None,
     limit: int = 100,
+    session_id: str | None = None,
+    hook: str | None = None,
+    tool_name: str | None = None,
+    status_filter: str | None = Query(None, alias="status"),
+    agent_id: str | None = None,
 ) -> dict[str, Any]:
     """Query events with optional filtering.
 
@@ -247,6 +253,11 @@ async def query_events(
         since: Filter events after this timestamp (ISO8601)
         until: Filter events before this timestamp (ISO8601)
         limit: Maximum number of events to return (default 100, max 1000)
+        session_id: Filter by session ID
+        hook: Filter by hook type
+        tool_name: Filter by tool name
+        status_filter: Filter by status (success/failure/pending)
+        agent_id: Filter by agent ID
 
     Returns:
         JSON response with events list
@@ -270,6 +281,11 @@ async def query_events(
         since=since,
         until=until,
         limit=limit,
+        session_id=session_id,
+        hook=hook,
+        tool_name=tool_name,
+        status=status_filter,
+        agent_id=agent_id,
     )
 
     return {"events": events}
