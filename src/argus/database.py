@@ -31,6 +31,9 @@ class Database:
         # Create schema if not exists
         self._create_schema()
 
+        # Run migrations for schema evolution
+        self._run_migrations()
+
     def _create_schema(self) -> None:
         """Create events table and indexes."""
         with self.conn:
@@ -53,6 +56,48 @@ class Database:
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON events(timestamp)")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_level ON events(level)")
 
+    def _get_existing_columns(self, table: str) -> set[str]:
+        """Get set of existing column names for a table.
+
+        Args:
+            table: Table name to inspect
+
+        Returns:
+            Set of column names
+        """
+        cursor = self.conn.execute(f"PRAGMA table_info({table})")
+        return {row[1] for row in cursor.fetchall()}
+
+    def _run_migrations(self) -> None:
+        """Run schema migrations for new columns.
+
+        Adds new columns to events table if they don't exist.
+        Each ALTER TABLE is atomic in SQLite, so partial failures are safe.
+        """
+        existing = self._get_existing_columns("events")
+
+        # New columns for iteration 3: agent observability
+        new_columns = [
+            ("session_id", "TEXT"),
+            ("hook", "TEXT"),
+            ("tool_name", "TEXT"),
+            ("tool_use_id", "TEXT"),
+            ("status", "TEXT"),
+            ("agent_id", "TEXT"),
+        ]
+
+        with self.conn:
+            for col_name, col_type in new_columns:
+                if col_name not in existing:
+                    self.conn.execute(f"ALTER TABLE events ADD COLUMN {col_name} {col_type}")
+
+            # Create indexes for new columns (idempotent)
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_session_id ON events(session_id)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_hook ON events(hook)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_tool_name ON events(tool_name)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON events(status)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_id ON events(agent_id)")
+
     def get_journal_mode(self) -> str:
         """Get current journal mode (for verification).
 
@@ -67,7 +112,8 @@ class Database:
         """Store event in database.
 
         Args:
-            event: Event dictionary with source, event_type, and optional fields
+            event: Event dictionary with source, event_type, and optional fields.
+                   New fields: session_id, hook, tool_name, tool_use_id, status, agent_id
 
         Returns:
             Event ID (auto-generated primary key)
@@ -87,8 +133,11 @@ class Database:
             with self.conn:
                 cursor = self.conn.execute(
                     """
-                    INSERT INTO events (source, event_type, timestamp, message, level, data)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO events (
+                        source, event_type, timestamp, message, level, data,
+                        session_id, hook, tool_name, tool_use_id, status, agent_id
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         event["source"],
@@ -97,6 +146,12 @@ class Database:
                         event.get("message"),
                         event.get("level"),
                         data_blob,
+                        event.get("session_id"),
+                        event.get("hook"),
+                        event.get("tool_name"),
+                        event.get("tool_use_id"),
+                        event.get("status"),
+                        event.get("agent_id"),
                     ),
                 )
                 event_id = cursor.lastrowid
@@ -148,7 +203,8 @@ class Database:
 
         # Build query with parameterized values only
         base_query = (
-            "SELECT id, source, event_type, timestamp, message, level, data, created_at FROM events"
+            "SELECT id, source, event_type, timestamp, message, level, data, created_at, "
+            "session_id, hook, tool_name, tool_use_id, status, agent_id FROM events"
         )
 
         if where_clauses:
@@ -175,6 +231,12 @@ class Database:
                 "level": row[5],
                 "data": json.loads(row[6]) if row[6] else None,
                 "created_at": row[7],
+                "session_id": row[8],
+                "hook": row[9],
+                "tool_name": row[10],
+                "tool_use_id": row[11],
+                "status": row[12],
+                "agent_id": row[13],
             }
             events.append(event)
 
