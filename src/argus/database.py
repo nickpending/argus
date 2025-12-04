@@ -101,9 +101,10 @@ class Database:
         return {row[1] for row in cursor.fetchall()}
 
     def _run_migrations(self) -> None:
-        """Run schema migrations for new columns.
+        """Run schema migrations for new columns and backfill data.
 
         Adds new columns to events table if they don't exist.
+        Backfills session_id from JSON data blob where present.
         Each ALTER TABLE is atomic in SQLite, so partial failures are safe.
         """
         existing = self._get_existing_columns("events")
@@ -129,6 +130,15 @@ class Database:
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_tool_name ON events(tool_name)")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON events(status)")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_id ON events(agent_id)")
+
+            # Backfill session_id from JSON data blob (idempotent - only updates NULL)
+            self.conn.execute("""
+                UPDATE events
+                SET session_id = json_extract(data, '$.session_id')
+                WHERE session_id IS NULL
+                  AND data IS NOT NULL
+                  AND json_extract(data, '$.session_id') IS NOT NULL
+            """)
 
     def get_journal_mode(self) -> str:
         """Get current journal mode (for verification).
