@@ -56,6 +56,38 @@ class Database:
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON events(timestamp)")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_level ON events(level)")
 
+            # Sessions table for session lifecycle tracking
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    id TEXT PRIMARY KEY,
+                    project TEXT,
+                    started_at TEXT NOT NULL,
+                    ended_at TEXT,
+                    status TEXT DEFAULT 'active'
+                )
+            """)
+
+            # Agents table for agent/subagent tracking
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS agents (
+                    id TEXT PRIMARY KEY,
+                    type TEXT NOT NULL,
+                    name TEXT,
+                    session_id TEXT NOT NULL,
+                    parent_agent_id TEXT,
+                    status TEXT DEFAULT 'running',
+                    created_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    event_count INTEGER DEFAULT 0,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """)
+
+            # Indexes for sessions and agents
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_agents_session ON agents(session_id)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status)")
+
     def _get_existing_columns(self, table: str) -> set[str]:
         """Get set of existing column names for a table.
 
