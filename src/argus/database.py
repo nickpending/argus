@@ -329,6 +329,76 @@ class Database:
         rows = cursor.fetchall()
         return [str(row[0]) for row in rows]
 
+    def get_sessions(self) -> list[dict[str, Any]]:
+        """Get list of sessions with agent counts.
+
+        Returns:
+            List of session dicts with id, project, started_at, ended_at, status, agent_count
+        """
+        cursor = self.conn.execute("""
+            SELECT s.id, s.project, s.started_at, s.ended_at, s.status,
+                   COUNT(a.id) as agent_count
+            FROM sessions s
+            LEFT JOIN agents a ON a.session_id = s.id
+            GROUP BY s.id
+            ORDER BY s.started_at DESC
+        """)
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "project": row[1],
+                "started_at": row[2],
+                "ended_at": row[3],
+                "status": row[4],
+                "agent_count": row[5],
+            }
+            for row in rows
+        ]
+
+    def get_agents(self, session_id: str | None = None) -> list[dict[str, Any]]:
+        """Get list of agents, optionally filtered by session.
+
+        Args:
+            session_id: Optional session ID to filter by
+
+        Returns:
+            List of agent dicts with id, type, name, session_id, status, event_count
+        """
+        if session_id is not None:
+            cursor = self.conn.execute(
+                """
+                SELECT id, type, name, session_id, parent_agent_id, status,
+                       created_at, completed_at, event_count
+                FROM agents
+                WHERE session_id = ?
+                ORDER BY created_at DESC
+                """,
+                (session_id,),
+            )
+        else:
+            cursor = self.conn.execute("""
+                SELECT id, type, name, session_id, parent_agent_id, status,
+                       created_at, completed_at, event_count
+                FROM agents
+                ORDER BY created_at DESC
+            """)
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "type": row[1],
+                "name": row[2],
+                "session_id": row[3],
+                "parent_agent_id": row[4],
+                "status": row[5],
+                "created_at": row[6],
+                "completed_at": row[7],
+                "event_count": row[8],
+            }
+            for row in rows
+        ]
+
     def cleanup_old_events(self, retention_days: int, vacuum: bool = False) -> int:
         """Delete events older than retention threshold.
 

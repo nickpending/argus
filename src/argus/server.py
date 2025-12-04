@@ -339,6 +339,56 @@ async def get_event_types(
     return {"event_types": event_types}
 
 
+# GET /sessions endpoint - Discovery endpoint for sessions with agent counts
+@app.get("/sessions")
+async def get_sessions(
+    request: Request,
+    _api_key: str | None = Depends(verify_optional_api_key),
+) -> dict[str, Any]:
+    """Get list of sessions with agent counts.
+
+    Args:
+        request: FastAPI request for app.state access
+        _api_key: Validated API key or None (via dependency)
+
+    Returns:
+        JSON response with sessions list including agent_count per session
+
+    Raises:
+        HTTPException: 401 if API key provided but invalid
+    """
+    db = request.app.state.db
+    sessions = db.get_sessions()
+
+    return {"sessions": sessions}
+
+
+# GET /agents endpoint - Discovery endpoint for agents with optional session filter
+@app.get("/agents")
+async def get_agents(
+    request: Request,
+    _api_key: str | None = Depends(verify_optional_api_key),
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    """Get list of agents, optionally filtered by session.
+
+    Args:
+        request: FastAPI request for app.state access
+        _api_key: Validated API key or None (via dependency)
+        session_id: Optional session ID to filter agents
+
+    Returns:
+        JSON response with agents list
+
+    Raises:
+        HTTPException: 401 if API key provided but invalid
+    """
+    db = request.app.state.db
+    agents = db.get_agents(session_id=session_id)
+
+    return {"agents": agents}
+
+
 # WebSocket /ws endpoint - Real-time event streaming with auth and filtering
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
