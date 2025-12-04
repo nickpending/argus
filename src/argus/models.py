@@ -107,6 +107,30 @@ class EventCreate(BaseModel):
     level: str | None = Field(default=None, description="Log level (debug/info/warn/error)")
     data: dict[str, Any] | None = Field(default=None, description="Arbitrary JSON data")
 
+    # Agent observability fields (all optional for backwards compatibility)
+    session_id: str | None = Field(default=None, description="Claude Code session identifier")
+    hook: (
+        Literal[
+            "PreToolUse",
+            "PostToolUse",
+            "Stop",
+            "SessionStart",
+            "SessionEnd",
+            "SubagentStart",
+            "SubagentStop",
+            "UserPromptSubmit",
+        ]
+        | None
+    ) = Field(default=None, description="Claude Code hook that fired")
+    tool_name: str | None = Field(default=None, description="Tool invoked (Bash, Read, Edit, etc.)")
+    tool_use_id: str | None = Field(
+        default=None, description="Correlates PreToolUse/PostToolUse pairs"
+    )
+    status: Literal["success", "failure", "pending"] | None = Field(
+        default=None, description="Event outcome"
+    )
+    agent_id: str | None = Field(default=None, description="Links event to agent instance")
+
     @field_validator("source")
     @classmethod
     def validate_source_pattern(cls, v: str) -> str:
