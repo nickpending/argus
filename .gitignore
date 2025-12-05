@@ -81,6 +81,9 @@ ehthumbs.db
 # Workflow (generated/cached content)
 .workflow/
 
+# Internal documentation (not for distribution)
+docs/
+
 # Workspace protection
 .claude/
 .claudex/
