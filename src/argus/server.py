@@ -224,6 +224,31 @@ async def create_event(
         else:
             logger.warning("SessionEnd event missing session_id, skipping session update")
 
+    # Handle agent lifecycle events
+    agent_id = event_dict.get("agent_id")
+
+    if hook == "SubagentStart":
+        if agent_id and session_id:
+            data = event_dict.get("data") or {}
+            agent_type = data.get("type", "subagent")
+            name = data.get("name")
+            parent_agent_id = data.get("parent_agent_id")
+            db.create_agent(agent_id, session_id, agent_type, name, parent_agent_id)
+        else:
+            if not agent_id:
+                logger.warning("SubagentStart event missing agent_id, skipping agent creation")
+            if not session_id:
+                logger.warning("SubagentStart event missing session_id, skipping agent creation")
+
+    elif hook == "SubagentStop":
+        if agent_id:
+            data = event_dict.get("data") or {}
+            status = data.get("status", "completed")
+            if not db.update_agent_completed(agent_id, status):
+                logger.warning(f"SubagentStop for unknown agent: {agent_id}")
+        else:
+            logger.warning("SubagentStop event missing agent_id, skipping agent update")
+
     # Store event in database
     event_id = db.store_event(event_dict)
 

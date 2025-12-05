@@ -441,6 +441,66 @@ class Database:
         self.conn.commit()
         return cursor.rowcount > 0
 
+    def create_agent(
+        self,
+        agent_id: str,
+        session_id: str,
+        agent_type: str = "subagent",
+        name: str | None = None,
+        parent_agent_id: str | None = None,
+    ) -> bool:
+        """Create agent record if not exists (idempotent).
+
+        Args:
+            agent_id: Unique agent identifier
+            session_id: Parent session ID
+            agent_type: Agent type (e.g., 'subagent', 'agent')
+            name: Human-readable agent name
+            parent_agent_id: Parent agent ID for nested agents
+
+        Returns:
+            True if agent was created, False if already existed
+        """
+        created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        cursor = self.conn.execute(
+            """
+            INSERT OR IGNORE INTO agents (id, type, name, session_id, parent_agent_id, status, created_at)
+            VALUES (?, ?, ?, ?, ?, 'running', ?)
+            """,
+            (agent_id, agent_type, name, session_id, parent_agent_id, created_at),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def update_agent_completed(self, agent_id: str, status: str = "completed") -> bool:
+        """Update agent status to completed and calculate event_count.
+
+        Args:
+            agent_id: Agent identifier
+            status: Final status (e.g., 'completed', 'failed')
+
+        Returns:
+            True if agent was updated, False if not found
+        """
+        completed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        # Count events for this agent
+        count_cursor = self.conn.execute(
+            "SELECT COUNT(*) FROM events WHERE agent_id = ?",
+            (agent_id,),
+        )
+        event_count = count_cursor.fetchone()[0]
+
+        cursor = self.conn.execute(
+            """
+            UPDATE agents
+            SET completed_at = ?, status = ?, event_count = ?
+            WHERE id = ?
+            """,
+            (completed_at, status, event_count, agent_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
     def cleanup_old_events(self, retention_days: int, vacuum: bool = False) -> int:
         """Delete events older than retention threshold.
 
