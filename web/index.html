@@ -33,12 +33,49 @@
 
     <!-- Three-Panel Layout -->
     <main class="main-container">
-        <!-- Left Panel: Filters -->
+        <!-- Left Panel: Sessions & Filters -->
         <aside class="panel left-panel" id="left-panel">
-            <div class="panel-header">
-                <h2>Filters</h2>
+            <!-- Session/Agent Tree -->
+            <div class="panel-section session-section">
+                <div class="panel-header">
+                    <h2>Sessions</h2>
+                    <span class="session-count" id="session-count">0</span>
+                </div>
+                <div class="panel-content">
+                    <nav class="session-tree" id="session-tree">
+                        <!-- Sessions populated by JavaScript -->
+                        <div class="tree-empty" id="tree-empty">
+                            <p>No sessions</p>
+                        </div>
+                        <!-- Example structure for CSS development:
+                        <div class="tree-item session" data-session-id="abc123">
+                            <button class="tree-toggle" aria-expanded="true">
+                                <span class="toggle-icon"></span>
+                                <span class="status-dot active"></span>
+                                <span class="tree-label">argus</span>
+                                <span class="tree-meta">3 agents</span>
+                            </button>
+                            <div class="tree-children">
+                                <div class="tree-item agent" data-agent-id="agent1">
+                                    <button class="tree-toggle leaf">
+                                        <span class="status-dot running"></span>
+                                        <span class="tree-label">code-reviewer</span>
+                                        <span class="tree-meta">12 events</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        -->
+                    </nav>
+                </div>
             </div>
-            <div class="panel-content">
+
+            <!-- Filters Section -->
+            <div class="panel-section filter-section">
+                <div class="panel-header">
+                    <h2>Filters</h2>
+                </div>
+                <div class="panel-content">
                 <div class="filter-group">
                     <label for="filter-source">Source</label>
                     <select id="filter-source">
@@ -84,6 +121,7 @@
                 <div class="filter-actions">
                     <button class="apply-btn" id="filter-apply">Apply</button>
                     <button class="clear-btn" id="filter-clear">Clear</button>
+                </div>
                 </div>
             </div>
         </aside>
