@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   initializeEventListeners();
   loadSourceOptions();
+  loadSessionTree();
   connect();
 });
 
@@ -79,6 +80,11 @@ function cacheElements() {
   elements.timeRangeCustom = document.getElementById("time-range-custom");
   elements.filterTimeStart = document.getElementById("filter-time-start");
   elements.filterTimeEnd = document.getElementById("filter-time-end");
+
+  // Session tree elements
+  elements.sessionTree = document.getElementById("session-tree");
+  elements.sessionCount = document.getElementById("session-count");
+  elements.treeEmpty = document.getElementById("tree-empty");
 }
 
 // Initialize event listeners
@@ -865,4 +871,163 @@ function exportCsv() {
 
   URL.revokeObjectURL(url);
   console.log(`Exported ${visibleRows.length} events to CSV`);
+}
+
+// Load session tree from API
+async function loadSessionTree() {
+  try {
+    // Fetch sessions
+    const sessionsResponse = await fetch("/sessions");
+    if (!sessionsResponse.ok) {
+      console.error("Failed to load sessions:", sessionsResponse.status);
+      return;
+    }
+
+    const sessionsData = await sessionsResponse.json();
+    const sessions = sessionsData.sessions || [];
+
+    // Fetch all agents (we'll group by session_id client-side)
+    const agentsResponse = await fetch("/agents");
+    if (!agentsResponse.ok) {
+      console.error("Failed to load agents:", agentsResponse.status);
+      return;
+    }
+
+    const agentsData = await agentsResponse.json();
+    const agents = agentsData.agents || [];
+
+    // Group agents by session_id
+    const agentsBySession = {};
+    agents.forEach((agent) => {
+      if (agent.session_id) {
+        if (!agentsBySession[agent.session_id]) {
+          agentsBySession[agent.session_id] = [];
+        }
+        agentsBySession[agent.session_id].push(agent);
+      }
+    });
+
+    // Render the tree
+    renderSessionTree(sessions, agentsBySession);
+
+    console.log(
+      `Loaded ${sessions.length} sessions with ${agents.length} agents`,
+    );
+  } catch (error) {
+    console.error("Error loading session tree:", error);
+  }
+}
+
+// Render session tree to DOM
+function renderSessionTree(sessions, agentsBySession) {
+  // Update session count
+  updateSessionCount(sessions.length);
+
+  // Show/hide empty state
+  if (sessions.length === 0) {
+    elements.treeEmpty.style.display = "";
+    return;
+  }
+  elements.treeEmpty.style.display = "none";
+
+  // Clear existing tree items (keep empty state element)
+  const existingItems = elements.sessionTree.querySelectorAll(".tree-item");
+  existingItems.forEach((item) => item.remove());
+
+  // Render each session
+  sessions.forEach((session) => {
+    const sessionAgents = agentsBySession[session.id] || [];
+    const sessionElement = createSessionElement(session, sessionAgents);
+    elements.sessionTree.appendChild(sessionElement);
+  });
+}
+
+// Create session tree item element
+function createSessionElement(session, agents) {
+  const item = document.createElement("div");
+  item.className = "tree-item session";
+  item.dataset.sessionId = session.id;
+
+  // Determine status class
+  const statusClass = session.status === "active" ? "active" : "ended";
+
+  // Session label - use project name or truncated session ID
+  const label = session.project || session.id.substring(0, 8);
+
+  // Agent count text
+  const agentText = agents.length === 1 ? "1 agent" : `${agents.length} agents`;
+
+  // Has agents to expand?
+  const hasAgents = agents.length > 0;
+  const expandedAttr = hasAgents ? 'aria-expanded="false"' : "";
+  const leafClass = hasAgents ? "" : " leaf";
+
+  item.innerHTML = `
+    <button class="tree-toggle${leafClass}" ${expandedAttr}>
+      ${hasAgents ? '<span class="toggle-icon"></span>' : ""}
+      <span class="status-dot ${statusClass}"></span>
+      <span class="tree-label">${escapeHtml(label)}</span>
+      <span class="tree-meta">${escapeHtml(agentText)}</span>
+    </button>
+    ${hasAgents ? '<div class="tree-children"></div>' : ""}
+  `;
+
+  // Add agents to children container
+  if (hasAgents) {
+    const childrenContainer = item.querySelector(".tree-children");
+    agents.forEach((agent) => {
+      const agentElement = createAgentElement(agent);
+      childrenContainer.appendChild(agentElement);
+    });
+
+    // Add toggle handler
+    const toggleButton = item.querySelector(".tree-toggle");
+    toggleButton.addEventListener("click", handleTreeToggle);
+  }
+
+  return item;
+}
+
+// Create agent tree item element
+function createAgentElement(agent) {
+  const item = document.createElement("div");
+  item.className = "tree-item agent";
+  item.dataset.agentId = agent.id;
+
+  // Determine status class
+  let statusClass = "running";
+  if (agent.status === "completed") {
+    statusClass = "completed";
+  } else if (agent.status === "failed") {
+    statusClass = "failed";
+  }
+
+  // Agent label - use name or type
+  const label = agent.name || agent.type || "agent";
+
+  // Event count text
+  const eventCount = agent.event_count || 0;
+  const eventText = eventCount === 1 ? "1 event" : `${eventCount} events`;
+
+  item.innerHTML = `
+    <button class="tree-toggle leaf">
+      <span class="status-dot ${statusClass}"></span>
+      <span class="tree-label">${escapeHtml(label)}</span>
+      <span class="tree-meta">${escapeHtml(eventText)}</span>
+    </button>
+  `;
+
+  return item;
+}
+
+// Handle tree toggle click (expand/collapse)
+function handleTreeToggle(event) {
+  const button = event.currentTarget;
+  const isExpanded = button.getAttribute("aria-expanded") === "true";
+  button.setAttribute("aria-expanded", !isExpanded);
+}
+
+// Update session count badge
+function updateSessionCount(count) {
+  elements.sessionCount.textContent = count;
 }
