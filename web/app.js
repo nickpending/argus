@@ -22,6 +22,8 @@ const state = {
   currentTimeRange: "all", // "all", "1h", "24h", "7d", "custom"
   eventCount: 0,
   selectedEventId: null,
+  selectedSessionId: null, // Selected session in tree for filtering
+  selectedAgentId: null, // Selected agent in tree for filtering
   knownEventIds: new Set(), // Track rendered event IDs for deduplication
   isLoadingHistory: false, // Loading state for historical fetch
 };
@@ -298,6 +300,12 @@ function renderEvent(event) {
   if (event.level) {
     row.dataset.level = event.level;
   }
+  if (event.session_id) {
+    row.dataset.sessionId = event.session_id;
+  }
+  if (event.agent_id) {
+    row.dataset.agentId = event.agent_id;
+  }
 
   const timestamp = formatTimestamp(event.timestamp);
   const level = event.level || "debug";
@@ -514,6 +522,14 @@ function collectFilters() {
     filters.time_until = timeRange.until;
   }
 
+  // Session/agent tree selection
+  if (state.selectedSessionId) {
+    filters.session_id = state.selectedSessionId;
+  }
+  if (state.selectedAgentId) {
+    filters.agent_id = state.selectedAgentId;
+  }
+
   return filters;
 }
 
@@ -584,6 +600,9 @@ function clearFilters() {
   elements.filterTimeStart.value = "";
   elements.filterTimeEnd.value = "";
   state.currentTimeRange = "all";
+
+  // Clear session/agent tree selection
+  clearTreeSelection();
 
   state.currentFilters = {};
   filterTableRows({});
@@ -663,6 +682,21 @@ function rowMatchesFilter(row, filters) {
     }
   }
 
+  // Session/agent tree filtering
+  if (filters.session_id) {
+    const rowSessionId = row.dataset.sessionId || "";
+    if (rowSessionId !== filters.session_id) {
+      return false;
+    }
+  }
+
+  if (filters.agent_id) {
+    const rowAgentId = row.dataset.agentId || "";
+    if (rowAgentId !== filters.agent_id) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -721,6 +755,12 @@ async function fetchHistoricalEvents(filters) {
     if (filters.time_until) {
       params.append("until", filters.time_until);
     }
+    if (filters.session_id) {
+      params.append("session_id", filters.session_id);
+    }
+    if (filters.agent_id) {
+      params.append("agent_id", filters.agent_id);
+    }
     params.append("limit", "500"); // Fetch more for historical view
 
     const url = `/events?${params.toString()}`;
@@ -778,6 +818,12 @@ function renderEventWithoutFilter(event) {
   row.dataset.timestamp = event.timestamp;
   if (event.level) {
     row.dataset.level = event.level;
+  }
+  if (event.session_id) {
+    row.dataset.sessionId = event.session_id;
+  }
+  if (event.agent_id) {
+    row.dataset.agentId = event.agent_id;
   }
 
   const timestamp = formatTimestamp(event.timestamp);
@@ -976,23 +1022,36 @@ function createSessionElement(session, agents) {
   if (hasAgents) {
     const childrenContainer = item.querySelector(".tree-children");
     agents.forEach((agent) => {
-      const agentElement = createAgentElement(agent);
+      const agentElement = createAgentElement(agent, session.id);
       childrenContainer.appendChild(agentElement);
     });
 
-    // Add toggle handler
-    const toggleButton = item.querySelector(".tree-toggle");
-    toggleButton.addEventListener("click", handleTreeToggle);
+    // Add expand/collapse handler to toggle icon only
+    const toggleIcon = item.querySelector(".toggle-icon");
+    if (toggleIcon) {
+      toggleIcon.addEventListener("click", handleTreeToggle);
+    }
   }
+
+  // Add filter click handler to the button (entire row)
+  const toggleButton = item.querySelector(".tree-toggle");
+  toggleButton.addEventListener("click", (event) => {
+    // Ignore if clicking on toggle icon (handled separately)
+    if (event.target.classList.contains("toggle-icon")) {
+      return;
+    }
+    handleSessionClick(session.id, item);
+  });
 
   return item;
 }
 
 // Create agent tree item element
-function createAgentElement(agent) {
+function createAgentElement(agent, sessionId) {
   const item = document.createElement("div");
   item.className = "tree-item agent";
   item.dataset.agentId = agent.id;
+  item.dataset.sessionId = sessionId;
 
   // Determine status class
   let statusClass = "running";
@@ -1017,14 +1076,64 @@ function createAgentElement(agent) {
     </button>
   `;
 
+  // Add filter click handler
+  const toggleButton = item.querySelector(".tree-toggle");
+  toggleButton.addEventListener("click", () => {
+    handleAgentClick(agent.id, sessionId, item);
+  });
+
   return item;
 }
 
 // Handle tree toggle click (expand/collapse)
 function handleTreeToggle(event) {
-  const button = event.currentTarget;
+  event.stopPropagation(); // Prevent triggering filter click
+  const toggleIcon = event.currentTarget;
+  const button = toggleIcon.closest(".tree-toggle");
   const isExpanded = button.getAttribute("aria-expanded") === "true";
   button.setAttribute("aria-expanded", !isExpanded);
+}
+
+// Handle session click for filtering
+function handleSessionClick(sessionId, treeItem) {
+  // Toggle selection - if already selected, deselect
+  if (state.selectedSessionId === sessionId && !state.selectedAgentId) {
+    clearTreeSelection();
+  } else {
+    // Clear previous selection and select this session
+    clearTreeSelection();
+    state.selectedSessionId = sessionId;
+    state.selectedAgentId = null;
+    treeItem.classList.add("selected");
+  }
+  applyFilters();
+}
+
+// Handle agent click for filtering
+function handleAgentClick(agentId, sessionId, treeItem) {
+  // Toggle selection - if already selected, deselect
+  if (state.selectedAgentId === agentId) {
+    clearTreeSelection();
+  } else {
+    // Clear previous selection and select this agent (and its session)
+    clearTreeSelection();
+    state.selectedSessionId = sessionId;
+    state.selectedAgentId = agentId;
+    treeItem.classList.add("selected");
+  }
+  applyFilters();
+}
+
+// Clear tree selection visual state and filter state
+function clearTreeSelection() {
+  state.selectedSessionId = null;
+  state.selectedAgentId = null;
+
+  // Remove .selected class from all tree items
+  const selectedItems = elements.sessionTree.querySelectorAll(
+    ".tree-item.selected",
+  );
+  selectedItems.forEach((item) => item.classList.remove("selected"));
 }
 
 // Update session count badge
