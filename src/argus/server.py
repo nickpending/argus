@@ -202,8 +202,29 @@ async def create_event(
     if event_dict.get("timestamp") is None:
         event_dict["timestamp"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
-    # Store in database
     db = request.app.state.db
+
+    # Handle session lifecycle events
+    hook = event_dict.get("hook")
+    session_id = event_dict.get("session_id")
+
+    if hook == "SessionStart":
+        if session_id:
+            # Extract project from data blob if present
+            data = event_dict.get("data") or {}
+            project = data.get("project")
+            db.create_session(session_id, project)
+        else:
+            logger.warning("SessionStart event missing session_id, skipping session creation")
+
+    elif hook == "SessionEnd":
+        if session_id:
+            if not db.update_session_ended(session_id):
+                logger.warning(f"SessionEnd for unknown session: {session_id}")
+        else:
+            logger.warning("SessionEnd event missing session_id, skipping session update")
+
+    # Store event in database
     event_id = db.store_event(event_dict)
 
     # Broadcast to WebSocket clients (non-blocking)

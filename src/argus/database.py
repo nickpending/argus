@@ -399,6 +399,48 @@ class Database:
             for row in rows
         ]
 
+    def create_session(self, session_id: str, project: str | None = None) -> bool:
+        """Create session record if not exists (idempotent).
+
+        Args:
+            session_id: Claude Code session identifier
+            project: Project name from event data
+
+        Returns:
+            True if session was created, False if already existed
+        """
+        started_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        cursor = self.conn.execute(
+            """
+            INSERT OR IGNORE INTO sessions (id, project, started_at, status)
+            VALUES (?, ?, ?, 'active')
+            """,
+            (session_id, project, started_at),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def update_session_ended(self, session_id: str) -> bool:
+        """Update session status to ended.
+
+        Args:
+            session_id: Claude Code session identifier
+
+        Returns:
+            True if session was updated, False if not found
+        """
+        ended_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        cursor = self.conn.execute(
+            """
+            UPDATE sessions
+            SET ended_at = ?, status = 'ended'
+            WHERE id = ?
+            """,
+            (ended_at, session_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
     def cleanup_old_events(self, retention_days: int, vacuum: bool = False) -> int:
         """Delete events older than retention threshold.
 
