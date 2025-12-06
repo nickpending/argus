@@ -69,7 +69,9 @@ function cacheElements() {
   // Left panel (filters)
   elements.leftPanel = document.getElementById("left-panel");
   elements.filterSource = document.getElementById("filter-source");
-  elements.filterType = document.getElementById("filter-type");
+  elements.eventTypeChips = document.querySelectorAll(
+    ".event-type-chips .chip",
+  );
   elements.filterSearch = document.getElementById("filter-search");
   elements.filterApply = document.getElementById("filter-apply");
   elements.filterClear = document.getElementById("filter-clear");
@@ -101,6 +103,14 @@ function initializeEventListeners() {
     if (e.key === "Escape" && state.selectedEventId) {
       hideEventDetail();
     }
+  });
+
+  // Event type chip toggle buttons (auto-apply on click)
+  elements.eventTypeChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("active");
+      applyFilters();
+    });
   });
 
   // Level chip toggle buttons (auto-apply on click)
@@ -155,10 +165,7 @@ function initializeEventListeners() {
     clearFilters();
   });
 
-  // Apply filters on Enter key in text inputs
-  elements.filterType.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") applyFilters();
-  });
+  // Apply filters on Enter key in search input
   elements.filterSearch.addEventListener("keydown", (e) => {
     if (e.key === "Enter") applyFilters();
   });
@@ -495,9 +502,13 @@ function collectFilters() {
     filters.source = source;
   }
 
-  const eventType = elements.filterType.value.trim();
-  if (eventType) {
-    filters.event_type = eventType;
+  // Event type chips (multi-select)
+  const activeEventTypes = Array.from(elements.eventTypeChips)
+    .filter((chip) => chip.classList.contains("active"))
+    .map((chip) => chip.dataset.eventType);
+
+  if (activeEventTypes.length < 5) {
+    filters.event_types = activeEventTypes;
   }
 
   const activeLevels = Array.from(elements.levelChips)
@@ -585,8 +596,12 @@ function applyFilters() {
 // Clear all filters
 function clearFilters() {
   elements.filterSource.value = "";
-  elements.filterType.value = "";
   elements.filterSearch.value = "";
+
+  // Reset event type chips to all active
+  elements.eventTypeChips.forEach((chip) => {
+    chip.classList.add("active");
+  });
 
   elements.levelChips.forEach((chip) => {
     chip.classList.add("active");
@@ -641,8 +656,14 @@ function rowMatchesFilter(row, filters) {
     return false;
   }
 
-  if (filters.event_type && rowData.event_type !== filters.event_type) {
-    return false;
+  // Event type chips filtering (multi-select)
+  if (filters.event_types !== undefined) {
+    if (filters.event_types.length === 0) {
+      return false;
+    }
+    if (!filters.event_types.includes(rowData.event_type)) {
+      return false;
+    }
   }
 
   if (filters.levels !== undefined) {

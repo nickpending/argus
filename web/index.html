@@ -84,8 +84,14 @@
                 </div>
 
                 <div class="filter-group">
-                    <label for="filter-type">Event Type</label>
-                    <input type="text" id="filter-type" placeholder="e.g. thinking, tool_use">
+                    <label>Event Type</label>
+                    <div class="event-type-chips">
+                        <button class="chip active" data-event-type="tool">tool</button>
+                        <button class="chip active" data-event-type="session">session</button>
+                        <button class="chip active" data-event-type="agent">agent</button>
+                        <button class="chip active" data-event-type="response">response</button>
+                        <button class="chip active" data-event-type="prompt">prompt</button>
+                    </div>
                 </div>
 
                 <div class="filter-group">
