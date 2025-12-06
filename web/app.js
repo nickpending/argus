@@ -71,6 +71,7 @@ function cacheElements() {
   elements.leftPanel = document.getElementById("left-panel");
   elements.filterSource = document.getElementById("filter-source");
   elements.filterSession = document.getElementById("filter-session");
+  elements.filterAgent = document.getElementById("filter-agent");
   elements.eventTypeChips = document.querySelectorAll(
     ".event-type-chips .chip",
   );
@@ -186,6 +187,23 @@ function initializeEventListeners() {
     } else {
       // "All Sessions" selected - clear tree selection
       clearTreeSelection();
+    }
+    // Reload agent dropdown for selected session (or clear if no session)
+    loadAgentOptions(sessionId);
+    applyFilters();
+  });
+
+  // Agent dropdown change
+  elements.filterAgent.addEventListener("change", () => {
+    const agentId = elements.filterAgent.value;
+    if (agentId) {
+      // Sync tree selection to agent
+      syncTreeToAgent(agentId);
+      state.selectedAgentId = agentId;
+    } else {
+      // "All Agents" selected - clear agent selection but keep session
+      state.selectedAgentId = null;
+      clearAgentTreeSelection();
     }
     applyFilters();
   });
@@ -798,6 +816,55 @@ async function loadSessionOptions() {
   }
 }
 
+// Load agent options from API (filtered by session)
+async function loadAgentOptions(sessionId) {
+  // Clear existing options (keep "All Agents")
+  while (elements.filterAgent.options.length > 1) {
+    elements.filterAgent.remove(1);
+  }
+
+  // Disable if no session selected
+  if (!sessionId) {
+    elements.filterAgent.disabled = true;
+    elements.filterAgent.value = "";
+    return;
+  }
+
+  try {
+    const response = await fetch(`/agents?session_id=${sessionId}`);
+
+    if (!response.ok) {
+      console.error("Failed to load agents:", response.status);
+      return;
+    }
+
+    const data = await response.json();
+    const agents = data.agents || [];
+
+    // Enable dropdown if we have agents
+    elements.filterAgent.disabled = agents.length === 0;
+
+    agents.forEach((agent) => {
+      const option = document.createElement("option");
+      option.value = agent.id;
+      // Display name or type
+      const label = agent.name || agent.type || "agent";
+      const status =
+        agent.status === "running"
+          ? "●"
+          : agent.status === "completed"
+            ? "✓"
+            : "✗";
+      option.textContent = `${status} ${label}`;
+      elements.filterAgent.appendChild(option);
+    });
+
+    console.log(`Loaded ${agents.length} agents for filter dropdown`);
+  } catch (error) {
+    console.error("Error loading agents:", error);
+  }
+}
+
 // Fetch historical events from API based on current filters
 async function fetchHistoricalEvents(filters) {
   if (state.isLoadingHistory) {
@@ -1171,14 +1238,16 @@ function handleSessionClick(sessionId, treeItem) {
   // Toggle selection - if already selected, deselect
   if (state.selectedSessionId === sessionId && !state.selectedAgentId) {
     clearTreeSelection();
+    loadAgentOptions(null); // Clear agent dropdown
   } else {
     // Clear previous selection and select this session
     clearTreeSelection();
     state.selectedSessionId = sessionId;
     state.selectedAgentId = null;
     treeItem.classList.add("selected");
-    // Sync dropdown to match tree selection
+    // Sync dropdowns to match tree selection
     syncDropdownToTree(sessionId);
+    loadAgentOptions(sessionId);
   }
   applyFilters();
 }
@@ -1194,8 +1263,11 @@ function handleAgentClick(agentId, sessionId, treeItem) {
     state.selectedSessionId = sessionId;
     state.selectedAgentId = agentId;
     treeItem.classList.add("selected");
-    // Sync dropdown to session (agent belongs to this session)
+    // Sync dropdowns to match tree selection
     syncDropdownToTree(sessionId);
+    loadAgentOptions(sessionId).then(() => {
+      syncAgentDropdownToTree(agentId);
+    });
   }
   applyFilters();
 }
@@ -1211,8 +1283,10 @@ function clearTreeSelection() {
   );
   selectedItems.forEach((item) => item.classList.remove("selected"));
 
-  // Sync dropdown to cleared state
+  // Sync dropdowns to cleared state
   elements.filterSession.value = "";
+  elements.filterAgent.value = "";
+  elements.filterAgent.disabled = true;
 }
 
 // Sync tree visual selection to match dropdown selection
@@ -1235,6 +1309,44 @@ function syncTreeToDropdown(sessionId) {
 // Sync dropdown to match tree selection (called when tree item clicked)
 function syncDropdownToTree(sessionId) {
   elements.filterSession.value = sessionId || "";
+}
+
+// Sync tree to show agent selected (from agent dropdown)
+function syncTreeToAgent(agentId) {
+  // Remove existing selection
+  const selectedItems = elements.sessionTree.querySelectorAll(
+    ".tree-item.selected",
+  );
+  selectedItems.forEach((item) => item.classList.remove("selected"));
+
+  // Find and select the agent in tree
+  const agentItem = elements.sessionTree.querySelector(
+    `.tree-item.agent[data-agent-id="${agentId}"]`,
+  );
+  if (agentItem) {
+    agentItem.classList.add("selected");
+    // Expand parent session if collapsed
+    const parentSession = agentItem.closest(".tree-item.session");
+    if (parentSession) {
+      const toggleBtn = parentSession.querySelector(".tree-toggle");
+      if (toggleBtn && toggleBtn.getAttribute("aria-expanded") === "false") {
+        toggleBtn.setAttribute("aria-expanded", "true");
+      }
+    }
+  }
+}
+
+// Sync agent dropdown to match tree selection (called when tree agent clicked)
+function syncAgentDropdownToTree(agentId) {
+  elements.filterAgent.value = agentId || "";
+}
+
+// Clear only agent selection in tree (keep session selected)
+function clearAgentTreeSelection() {
+  const selectedAgents = elements.sessionTree.querySelectorAll(
+    ".tree-item.agent.selected",
+  );
+  selectedAgents.forEach((item) => item.classList.remove("selected"));
 }
 
 // Update session count badge
