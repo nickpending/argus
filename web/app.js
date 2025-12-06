@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   initializeEventListeners();
   loadSourceOptions();
+  loadSessionOptions();
   loadSessionTree();
   connect();
 });
@@ -69,6 +70,7 @@ function cacheElements() {
   // Left panel (filters)
   elements.leftPanel = document.getElementById("left-panel");
   elements.filterSource = document.getElementById("filter-source");
+  elements.filterSession = document.getElementById("filter-session");
   elements.eventTypeChips = document.querySelectorAll(
     ".event-type-chips .chip",
   );
@@ -172,6 +174,21 @@ function initializeEventListeners() {
 
   // Export CSV button
   elements.exportBtn.addEventListener("click", exportCsv);
+
+  // Session dropdown change
+  elements.filterSession.addEventListener("change", () => {
+    const sessionId = elements.filterSession.value;
+    if (sessionId) {
+      // Sync tree selection to dropdown
+      syncTreeToDropdown(sessionId);
+      state.selectedSessionId = sessionId;
+      state.selectedAgentId = null;
+    } else {
+      // "All Sessions" selected - clear tree selection
+      clearTreeSelection();
+    }
+    applyFilters();
+  });
 }
 
 // WebSocket connection management
@@ -747,6 +764,40 @@ async function loadSourceOptions() {
   }
 }
 
+// Load session options from API
+async function loadSessionOptions() {
+  try {
+    const response = await fetch("/sessions");
+
+    if (!response.ok) {
+      console.error("Failed to load sessions:", response.status);
+      return;
+    }
+
+    const data = await response.json();
+    const sessions = data.sessions || [];
+
+    // Clear existing options (keep "All Sessions")
+    while (elements.filterSession.options.length > 1) {
+      elements.filterSession.remove(1);
+    }
+
+    sessions.forEach((session) => {
+      const option = document.createElement("option");
+      option.value = session.id;
+      // Display project name or truncated session ID
+      const label = session.project || session.id.substring(0, 8);
+      const status = session.status === "active" ? "●" : "○";
+      option.textContent = `${status} ${label}`;
+      elements.filterSession.appendChild(option);
+    });
+
+    console.log(`Loaded ${sessions.length} sessions for filter dropdown`);
+  } catch (error) {
+    console.error("Error loading sessions:", error);
+  }
+}
+
 // Fetch historical events from API based on current filters
 async function fetchHistoricalEvents(filters) {
   if (state.isLoadingHistory) {
@@ -1126,6 +1177,8 @@ function handleSessionClick(sessionId, treeItem) {
     state.selectedSessionId = sessionId;
     state.selectedAgentId = null;
     treeItem.classList.add("selected");
+    // Sync dropdown to match tree selection
+    syncDropdownToTree(sessionId);
   }
   applyFilters();
 }
@@ -1141,6 +1194,8 @@ function handleAgentClick(agentId, sessionId, treeItem) {
     state.selectedSessionId = sessionId;
     state.selectedAgentId = agentId;
     treeItem.classList.add("selected");
+    // Sync dropdown to session (agent belongs to this session)
+    syncDropdownToTree(sessionId);
   }
   applyFilters();
 }
@@ -1155,6 +1210,31 @@ function clearTreeSelection() {
     ".tree-item.selected",
   );
   selectedItems.forEach((item) => item.classList.remove("selected"));
+
+  // Sync dropdown to cleared state
+  elements.filterSession.value = "";
+}
+
+// Sync tree visual selection to match dropdown selection
+function syncTreeToDropdown(sessionId) {
+  // Remove existing selection
+  const selectedItems = elements.sessionTree.querySelectorAll(
+    ".tree-item.selected",
+  );
+  selectedItems.forEach((item) => item.classList.remove("selected"));
+
+  // Find and select the session in tree
+  const sessionItem = elements.sessionTree.querySelector(
+    `.tree-item.session[data-session-id="${sessionId}"]`,
+  );
+  if (sessionItem) {
+    sessionItem.classList.add("selected");
+  }
+}
+
+// Sync dropdown to match tree selection (called when tree item clicked)
+function syncDropdownToTree(sessionId) {
+  elements.filterSession.value = sessionId || "";
 }
 
 // Update session count badge
