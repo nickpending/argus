@@ -208,18 +208,31 @@ async def create_event(
     hook = event_dict.get("hook")
     session_id = event_dict.get("session_id")
 
+    ws_manager = request.app.state.ws_manager
+
     if hook == "SessionStart":
         if session_id:
             # Extract project from data blob if present
             data = event_dict.get("data") or {}
             project = data.get("project")
             db.create_session(session_id, project)
+            # Broadcast session lifecycle to UI
+            session_data = db.get_session_by_id(session_id)
+            if session_data:
+                asyncio.create_task(ws_manager.broadcast_lifecycle("session_started", session_data))
         else:
             logger.warning("SessionStart event missing session_id, skipping session creation")
 
     elif hook == "SessionEnd":
         if session_id:
-            if not db.update_session_ended(session_id):
+            if db.update_session_ended(session_id):
+                # Broadcast session lifecycle to UI
+                session_data = db.get_session_by_id(session_id)
+                if session_data:
+                    asyncio.create_task(
+                        ws_manager.broadcast_lifecycle("session_ended", session_data)
+                    )
+            else:
                 logger.warning(f"SessionEnd for unknown session: {session_id}")
         else:
             logger.warning("SessionEnd event missing session_id, skipping session update")
@@ -234,6 +247,10 @@ async def create_event(
             name = data.get("name")
             parent_agent_id = data.get("parent_agent_id")
             db.create_agent(agent_id, session_id, agent_type, name, parent_agent_id)
+            # Broadcast agent lifecycle to UI
+            agent_data = db.get_agent_by_id(agent_id)
+            if agent_data:
+                asyncio.create_task(ws_manager.broadcast_lifecycle("agent_started", agent_data))
         else:
             if not agent_id:
                 logger.warning("SubagentStart event missing agent_id, skipping agent creation")
@@ -244,7 +261,14 @@ async def create_event(
         if agent_id:
             data = event_dict.get("data") or {}
             status = data.get("status", "completed")
-            if not db.update_agent_completed(agent_id, status):
+            if db.update_agent_completed(agent_id, status):
+                # Broadcast agent lifecycle to UI
+                agent_data = db.get_agent_by_id(agent_id)
+                if agent_data:
+                    asyncio.create_task(
+                        ws_manager.broadcast_lifecycle("agent_completed", agent_data)
+                    )
+            else:
                 logger.warning(f"SubagentStop for unknown agent: {agent_id}")
         else:
             logger.warning("SubagentStop event missing agent_id, skipping agent update")
@@ -252,8 +276,7 @@ async def create_event(
     # Store event in database
     event_id = db.store_event(event_dict)
 
-    # Broadcast to WebSocket clients (non-blocking)
-    ws_manager = request.app.state.ws_manager
+    # Broadcast event to WebSocket clients (non-blocking)
     # Construct complete event dict with ID for broadcast
     broadcast_event = {
         "id": event_id,

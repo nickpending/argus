@@ -399,6 +399,71 @@ class Database:
             for row in rows
         ]
 
+    def get_session_by_id(self, session_id: str) -> dict[str, Any] | None:
+        """Get single session by ID with agent count.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Session dict or None if not found
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT s.id, s.project, s.started_at, s.ended_at, s.status,
+                   COUNT(a.id) as agent_count
+            FROM sessions s
+            LEFT JOIN agents a ON a.session_id = s.id
+            WHERE s.id = ?
+            GROUP BY s.id
+            """,
+            (session_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "id": row[0],
+            "project": row[1],
+            "started_at": row[2],
+            "ended_at": row[3],
+            "status": row[4],
+            "agent_count": row[5],
+        }
+
+    def get_agent_by_id(self, agent_id: str) -> dict[str, Any] | None:
+        """Get single agent by ID.
+
+        Args:
+            agent_id: Agent identifier
+
+        Returns:
+            Agent dict or None if not found
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT id, type, name, session_id, parent_agent_id, status,
+                   created_at, completed_at, event_count
+            FROM agents
+            WHERE id = ?
+            """,
+            (agent_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "id": row[0],
+            "type": row[1],
+            "name": row[2],
+            "session_id": row[3],
+            "parent_agent_id": row[4],
+            "status": row[5],
+            "created_at": row[6],
+            "completed_at": row[7],
+            "event_count": row[8],
+        }
+
     def create_session(self, session_id: str, project: str | None = None) -> bool:
         """Create session record if not exists (idempotent).
 

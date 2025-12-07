@@ -252,6 +252,18 @@ function handleMessage(event) {
       case "event":
         handleEvent(message);
         break;
+      case "session_started":
+        handleSessionStarted(message.payload);
+        break;
+      case "session_ended":
+        handleSessionEnded(message.payload);
+        break;
+      case "agent_started":
+        handleAgentStarted(message.payload);
+        break;
+      case "agent_completed":
+        handleAgentCompleted(message.payload);
+        break;
       case "error":
         console.error("WebSocket error:", message.message);
         break;
@@ -331,6 +343,149 @@ function handleEvent(message) {
 
   // Render the event (filter check happens in renderEvent)
   renderEvent(event);
+}
+
+// Handle session started lifecycle event
+function handleSessionStarted(session) {
+  // Check if session already exists in tree (idempotent)
+  const existingSession = elements.sessionTree.querySelector(
+    `.tree-item.session[data-session-id="${session.id}"]`,
+  );
+  if (existingSession) {
+    return;
+  }
+
+  // Hide empty state if this is first session
+  elements.treeEmpty.style.display = "none";
+
+  // Create session element with no agents initially
+  const sessionElement = createSessionElement(session, []);
+
+  // Insert at top of tree (newest first)
+  const firstSession = elements.sessionTree.querySelector(".tree-item.session");
+  if (firstSession) {
+    elements.sessionTree.insertBefore(sessionElement, firstSession);
+  } else {
+    elements.sessionTree.appendChild(sessionElement);
+  }
+
+  // Update session count
+  const sessionCount =
+    elements.sessionTree.querySelectorAll(".tree-item.session").length;
+  updateSessionCount(sessionCount);
+
+  // Refresh session dropdown
+  loadSessionOptions();
+}
+
+// Handle session ended lifecycle event
+function handleSessionEnded(session) {
+  const sessionElement = elements.sessionTree.querySelector(
+    `.tree-item.session[data-session-id="${session.id}"]`,
+  );
+  if (!sessionElement) {
+    return;
+  }
+
+  // Update status dot from active to ended
+  const statusDot = sessionElement.querySelector(".status-dot");
+  if (statusDot) {
+    statusDot.classList.remove("active");
+    statusDot.classList.add("ended");
+  }
+
+  // Refresh session dropdown to update status indicator
+  loadSessionOptions();
+}
+
+// Handle agent started lifecycle event
+function handleAgentStarted(agent) {
+  // Find parent session in tree
+  const sessionElement = elements.sessionTree.querySelector(
+    `.tree-item.session[data-session-id="${agent.session_id}"]`,
+  );
+  if (!sessionElement) {
+    return;
+  }
+
+  // Check if agent already exists (idempotent)
+  const existingAgent = sessionElement.querySelector(
+    `.tree-item.agent[data-agent-id="${agent.id}"]`,
+  );
+  if (existingAgent) {
+    return;
+  }
+
+  // Get or create children container
+  let childrenContainer = sessionElement.querySelector(".tree-children");
+  const toggleButton = sessionElement.querySelector(".tree-toggle");
+
+  if (!childrenContainer) {
+    // Session was a leaf - need to add expand functionality
+    childrenContainer = document.createElement("div");
+    childrenContainer.className = "tree-children";
+    sessionElement.appendChild(childrenContainer);
+
+    // Add toggle icon to button
+    toggleButton.classList.remove("leaf");
+    toggleButton.setAttribute("aria-expanded", "false");
+    const toggleIcon = document.createElement("span");
+    toggleIcon.className = "toggle-icon";
+    toggleIcon.addEventListener("click", handleTreeToggle);
+    toggleButton.insertBefore(toggleIcon, toggleButton.firstChild);
+  }
+
+  // Create agent element
+  const agentElement = createAgentElement(agent, agent.session_id);
+  childrenContainer.appendChild(agentElement);
+
+  // Update agent count in session meta
+  const agentCount =
+    childrenContainer.querySelectorAll(".tree-item.agent").length;
+  const metaSpan = sessionElement.querySelector(".tree-meta");
+  if (metaSpan) {
+    metaSpan.textContent =
+      agentCount === 1 ? "1 agent" : `${agentCount} agents`;
+  }
+
+  // Auto-expand session to show new agent
+  toggleButton.setAttribute("aria-expanded", "true");
+
+  // Refresh agent dropdown if this session is selected
+  if (state.selectedSessionId === agent.session_id) {
+    loadAgentOptions(agent.session_id);
+  }
+}
+
+// Handle agent completed lifecycle event
+function handleAgentCompleted(agent) {
+  // Find agent element
+  const agentElement = elements.sessionTree.querySelector(
+    `.tree-item.agent[data-agent-id="${agent.id}"]`,
+  );
+  if (!agentElement) {
+    return;
+  }
+
+  // Update status dot
+  const statusDot = agentElement.querySelector(".status-dot");
+  if (statusDot) {
+    statusDot.classList.remove("running");
+    statusDot.classList.add(agent.status === "failed" ? "failed" : "completed");
+  }
+
+  // Update event count
+  const metaSpan = agentElement.querySelector(".tree-meta");
+  if (metaSpan && agent.event_count !== undefined) {
+    const eventText =
+      agent.event_count === 1 ? "1 event" : `${agent.event_count} events`;
+    metaSpan.textContent = eventText;
+  }
+
+  // Refresh agent dropdown if this session is selected
+  if (state.selectedSessionId === agent.session_id) {
+    loadAgentOptions(agent.session_id);
+  }
 }
 
 // Render event to table

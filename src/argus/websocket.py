@@ -144,3 +144,31 @@ class WebSocketManager:
                 for conn in disconnected:
                     if conn in self.connections:
                         self.connections.remove(conn)
+
+    async def broadcast_lifecycle(self, message_type: str, payload: dict[str, Any]) -> None:
+        """Broadcast lifecycle event to all authenticated clients.
+
+        Unlike broadcast(), this sends to ALL authenticated clients without filter matching.
+        Used for session/agent lifecycle events that update the UI tree.
+
+        Args:
+            message_type: Message type (e.g., 'session_started', 'agent_completed')
+            payload: Full session or agent object
+        """
+        async with self._lock:
+            connections_snapshot = list(self.connections)
+
+        disconnected: list[ClientConnection] = []
+
+        for conn in connections_snapshot:
+            if conn.authenticated:
+                try:
+                    await conn.websocket.send_json({"type": message_type, "payload": payload})
+                except Exception:
+                    disconnected.append(conn)
+
+        if disconnected:
+            async with self._lock:
+                for conn in disconnected:
+                    if conn in self.connections:
+                        self.connections.remove(conn)
