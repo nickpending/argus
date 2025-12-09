@@ -42,9 +42,13 @@
     --vw-level-warn: var(--vw-warning);
     --vw-level-error: var(--vw-danger);
 
-    /* Typography */
-    --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
-    --font-ui: 'JetBrains Mono', -apple-system, BlinkMacSystemFont, sans-serif;
+    /* Typography - Voidwire Font Stack */
+    --vw-font-body: 'Inter', system-ui, sans-serif;
+    --vw-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+    /* Legacy aliases (for compatibility) */
+    --font-mono: var(--vw-font-mono);
+    --font-ui: var(--vw-font-body);
 
     --text-xs: 0.75rem;
     --text-sm: 0.875rem;
