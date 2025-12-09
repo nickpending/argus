@@ -2,38 +2,45 @@
 
 /* CSS Custom Properties - Voidwire Design System */
 :root {
-    /* Base Colors (aligned with prismis.io) */
-    --bg-primary: #0a0e1a;
-    --bg-secondary: #0f1419;
-    --bg-elevated: #1a1f2e;
-    --bg-panel: #0f1419;
+    /* Primary Palette (The Heroes) */
+    --vw-cyan: #00D9FF;
+    --vw-purple: #E6CCFF;
+    --vw-vibrant-purple: #9F4DFF;
 
-    --text-primary: #e1e8ed;
-    --text-secondary: #8899a6;
-    --text-tertiary: #657786;
+    /* Semantic Palette (Muted - Tokyo noir treatment) */
+    --vw-success: #4a9e6b;
+    --vw-danger: #a65d6d;
+    --vw-warning: #a68a4d;
 
-    --border: #2f3336;
-    --border-bright: #38444d;
-    --border-accent: rgba(0, 212, 255, 0.3);
+    /* Neutral Palette */
+    --vw-white: #EEEEEE;
+    --vw-text: #BBBBBB;
+    --vw-gray: #666666;
+    --vw-dark-gray: #333333;
 
-    /* Accent Colors (clean cyberpunk - no glows) */
-    --cyan: #00d4ff;
-    --cyan-dim: #00a8cc;
-    --cyan-subtle: rgba(0, 212, 255, 0.15);
-    --cyan-bg: rgba(0, 212, 255, 0.08);
+    /* Background Surfaces */
+    --vw-bg-deep: #0a0e14;
+    --vw-bg-card: #0f1419;
+    --vw-bg-elevated: #151b23;
 
-    --purple: #9d7cd8;
-    --purple-subtle: rgba(157, 124, 216, 0.15);
+    /* Gradients */
+    --vw-gradient: linear-gradient(90deg, #00D9FF, #9F4DFF, #FF5C5C);
+    --vw-gradient-subtle: linear-gradient(90deg, #00D9FF, #9F4DFF);
 
-    --green: #00ff88;
-    --yellow: #ffd700;
-    --red: #ff5c5c;
+    /* Derived Colors (for convenience) */
+    --vw-cyan-dim: #00a8cc;
+    --vw-cyan-subtle: rgba(0, 217, 255, 0.15);
+    --vw-cyan-bg: rgba(0, 217, 255, 0.08);
+    --vw-purple-subtle: rgba(230, 204, 255, 0.15);
+    --vw-border: var(--vw-dark-gray);
+    --vw-border-bright: #38444d;
+    --vw-border-accent: rgba(0, 217, 255, 0.3);
 
-    /* Level Colors */
-    --level-debug: #657786;
-    --level-info: #00ff88;
-    --level-warn: #ffd700;
-    --level-error: #ff5c5c;
+    /* Level Colors (using semantic muted palette) */
+    --vw-level-debug: var(--vw-gray);
+    --vw-level-info: var(--vw-success);
+    --vw-level-warn: var(--vw-warning);
+    --vw-level-error: var(--vw-danger);
 
     /* Typography */
     --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
@@ -69,8 +76,8 @@ html {
 
 body {
     font-family: var(--font-ui);
-    background: var(--bg-primary);
-    color: var(--text-primary);
+    background: var(--vw-bg-deep);
+    color: var(--vw-text);
     line-height: 1.5;
     overflow: hidden;
     height: 100vh;
@@ -83,8 +90,8 @@ body {
 
 .argus-header {
     height: var(--header-height);
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border-bright);
+    background: var(--vw-bg-card);
+    border-bottom: 1px solid var(--vw-border-bright);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -97,7 +104,7 @@ body {
     font-size: var(--text-xl);
     font-weight: 700;
     letter-spacing: 0.15em;
-    color: var(--cyan);
+    color: var(--vw-cyan);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -124,19 +131,19 @@ body {
     align-items: center;
     gap: 0.5rem;
     font-size: var(--text-sm);
-    color: var(--text-secondary);
+    color: var(--vw-gray);
     cursor: pointer;
 }
 
 .scroll-controls input[type="checkbox"] {
     cursor: pointer;
-    accent-color: var(--cyan);
+    accent-color: var(--vw-cyan);
 }
 
 button {
-    background: var(--bg-elevated);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
+    background: var(--vw-bg-elevated);
+    color: var(--vw-text);
+    border: 1px solid var(--vw-border);
     padding: 0.5rem 1rem;
     border-radius: 4px;
     cursor: pointer;
@@ -146,8 +153,8 @@ button {
 }
 
 button:hover {
-    border-color: var(--cyan);
-    background: var(--bg-secondary);
+    border-color: var(--vw-cyan);
+    background: var(--vw-bg-card);
 }
 
 .status-indicator {
@@ -155,7 +162,7 @@ button:hover {
     align-items: center;
     gap: 0.5rem;
     font-size: var(--text-sm);
-    color: var(--text-secondary);
+    color: var(--vw-gray);
 }
 
 .status-dot {
@@ -167,16 +174,16 @@ button:hover {
 }
 
 .status-dot.connected {
-    background: var(--green);
+    background: var(--vw-success);
 }
 
 .status-dot.connecting {
-    background: var(--yellow);
+    background: var(--vw-warning);
     animation: pulse 1s ease-in-out infinite;
 }
 
 .status-dot.disconnected {
-    background: var(--text-tertiary);
+    background: var(--vw-gray);
 }
 
 /* ========================================
@@ -188,13 +195,13 @@ button:hover {
     grid-template-columns: var(--panel-left-width) 1fr var(--panel-right-width);
     grid-template-areas: "left center right";
     height: calc(100vh - var(--header-height));
-    background: var(--bg-primary);
+    background: var(--vw-bg-deep);
     gap: var(--panel-gap);
 }
 
 /* Panel Base Styles */
 .panel {
-    background: var(--bg-panel);
+    background: var(--vw-bg-card);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -205,15 +212,15 @@ button:hover {
     align-items: center;
     justify-content: space-between;
     padding: 0.875rem 1rem;
-    background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
+    background: var(--vw-bg-card);
+    border-bottom: 1px solid var(--vw-border);
     flex-shrink: 0;
 }
 
 .panel-header h2 {
     font-size: var(--text-sm);
     font-weight: 600;
-    color: var(--cyan);
+    color: var(--vw-cyan);
     text-transform: uppercase;
     letter-spacing: 0.1em;
 }
@@ -227,7 +234,7 @@ button:hover {
 /* Left Panel */
 .left-panel {
     grid-area: left;
-    border-right: 1px solid var(--border-accent);
+    border-right: 1px solid var(--vw-border-accent);
     display: flex;
     flex-direction: column;
 }
@@ -242,7 +249,7 @@ button:hover {
 .session-section {
     flex: 1;
     max-height: 50%;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--vw-border);
 }
 
 .filter-section {
@@ -263,11 +270,11 @@ button:hover {
 /* Session Count Badge */
 .session-count {
     font-size: var(--text-xs);
-    color: var(--text-tertiary);
-    background: var(--bg-primary);
+    color: var(--vw-gray);
+    background: var(--vw-bg-deep);
     padding: 0.125rem 0.5rem;
     border-radius: 3px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--vw-border);
 }
 
 /* ========================================
@@ -283,7 +290,7 @@ button:hover {
     align-items: center;
     justify-content: center;
     padding: 2rem 1rem;
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
     font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -307,7 +314,7 @@ button:hover {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 3px;
-    color: var(--text-primary);
+    color: var(--vw-text);
     cursor: pointer;
     transition: all var(--transition-fast);
     text-align: left;
@@ -316,18 +323,18 @@ button:hover {
 }
 
 .tree-toggle:hover {
-    background: var(--bg-elevated);
-    border-color: var(--border);
+    background: var(--vw-bg-elevated);
+    border-color: var(--vw-border);
 }
 
 .tree-toggle:focus {
     outline: none;
-    border-color: var(--cyan);
+    border-color: var(--vw-cyan);
 }
 
 .tree-item.selected > .tree-toggle {
-    background: var(--cyan-subtle);
-    border-color: var(--cyan);
+    background: var(--vw-cyan-subtle);
+    border-color: var(--vw-cyan);
 }
 
 /* Toggle Icon (expand/collapse arrow) */
@@ -337,7 +344,7 @@ button:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
     transition: transform var(--transition-fast);
 }
 
@@ -363,21 +370,21 @@ button:hover {
 }
 
 .status-dot.active {
-    background: var(--cyan);
+    background: var(--vw-cyan);
 }
 
 .status-dot.running {
-    background: var(--green);
+    background: var(--vw-success);
     animation: pulse 2s ease-in-out infinite;
 }
 
 .status-dot.ended,
 .status-dot.completed {
-    background: var(--text-tertiary);
+    background: var(--vw-gray);
 }
 
 .status-dot.failed {
-    background: var(--red);
+    background: var(--vw-danger);
 }
 
 /* Tree Labels */
@@ -390,7 +397,7 @@ button:hover {
 
 .tree-meta {
     font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
     flex-shrink: 0;
 }
 
@@ -398,7 +405,7 @@ button:hover {
 .tree-children {
     display: none;
     padding-left: 1.25rem;
-    border-left: 1px solid var(--border);
+    border-left: 1px solid var(--vw-border);
     margin-left: 0.75rem;
 }
 
@@ -419,7 +426,7 @@ button:hover {
 .filter-group label {
     display: block;
     font-size: var(--text-xs);
-    color: var(--text-secondary);
+    color: var(--vw-gray);
     margin-bottom: 0.5rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -429,9 +436,9 @@ button:hover {
 .filter-group input[type="text"],
 .filter-group select {
     width: 100%;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
+    background: var(--vw-bg-deep);
+    border: 1px solid var(--vw-border);
+    color: var(--vw-text);
     padding: 0.625rem 0.75rem;
     border-radius: 4px;
     font-size: var(--text-sm);
@@ -442,12 +449,12 @@ button:hover {
 .filter-group input[type="text"]:focus,
 .filter-group select:focus {
     outline: none;
-    border-color: var(--cyan);
-    box-shadow: 0 0 0 2px var(--cyan-subtle);
+    border-color: var(--vw-cyan);
+    box-shadow: 0 0 0 2px var(--vw-cyan-subtle);
 }
 
 .filter-group input[type="text"]::placeholder {
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
 }
 
 /* Level Chips */
@@ -461,9 +468,9 @@ button:hover {
     padding: 0.375rem 0.625rem;
     font-size: var(--text-xs);
     border-radius: 3px;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    color: var(--text-tertiary);
+    background: var(--vw-bg-deep);
+    border: 1px solid var(--vw-border);
+    color: var(--vw-gray);
     cursor: pointer;
     transition: all var(--transition-fast);
     text-transform: uppercase;
@@ -471,38 +478,38 @@ button:hover {
 }
 
 .chip:hover {
-    border-color: var(--text-secondary);
-    color: var(--text-secondary);
+    border-color: var(--vw-gray);
+    color: var(--vw-text);
 }
 
 .chip.active {
-    background: var(--cyan-subtle);
-    border-color: var(--cyan);
-    color: var(--cyan);
+    background: var(--vw-cyan-subtle);
+    border-color: var(--vw-cyan);
+    color: var(--vw-cyan);
 }
 
 .chip.active[data-level="debug"] {
-    background: rgba(96, 96, 112, 0.2);
-    border-color: var(--level-debug);
-    color: var(--text-secondary);
+    background: rgba(102, 102, 102, 0.2);
+    border-color: var(--vw-level-debug);
+    color: var(--vw-text);
 }
 
 .chip.active[data-level="info"] {
-    background: rgba(0, 255, 136, 0.15);
-    border-color: var(--level-info);
-    color: var(--level-info);
+    background: rgba(74, 158, 107, 0.15);
+    border-color: var(--vw-level-info);
+    color: var(--vw-level-info);
 }
 
 .chip.active[data-level="warn"] {
-    background: rgba(255, 215, 0, 0.15);
-    border-color: var(--level-warn);
-    color: var(--level-warn);
+    background: rgba(166, 138, 77, 0.15);
+    border-color: var(--vw-level-warn);
+    color: var(--vw-level-warn);
 }
 
 .chip.active[data-level="error"] {
-    background: rgba(255, 92, 92, 0.15);
-    border-color: var(--level-error);
-    color: var(--level-error);
+    background: rgba(166, 93, 109, 0.15);
+    border-color: var(--vw-level-error);
+    color: var(--vw-level-error);
 }
 
 /* Time Range Chips */
@@ -525,9 +532,9 @@ button:hover {
 
 .time-range-custom input[type="datetime-local"] {
     width: 100%;
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
+    background: var(--vw-bg-deep);
+    border: 1px solid var(--vw-border);
+    color: var(--vw-text);
     padding: 0.625rem 0.75rem;
     border-radius: 4px;
     font-size: var(--text-sm);
@@ -537,8 +544,8 @@ button:hover {
 
 .time-range-custom input[type="datetime-local"]:focus {
     outline: none;
-    border-color: var(--cyan);
-    box-shadow: 0 0 0 2px var(--cyan-subtle);
+    border-color: var(--vw-cyan);
+    box-shadow: 0 0 0 2px var(--vw-cyan-subtle);
 }
 
 /* Datetime input icon color fix for dark theme */
@@ -560,14 +567,14 @@ button:hover {
 }
 
 .apply-btn {
-    background: var(--cyan-subtle);
-    border-color: var(--cyan);
-    color: var(--cyan);
+    background: var(--vw-cyan-subtle);
+    border-color: var(--vw-cyan);
+    color: var(--vw-cyan);
 }
 
 .apply-btn:hover {
-    background: var(--cyan);
-    color: var(--bg-primary);
+    background: var(--vw-cyan);
+    color: var(--vw-bg-deep);
 }
 
 /* Center Panel: Events */
@@ -577,20 +584,20 @@ button:hover {
 }
 
 .center-panel .panel-header {
-    border-left: 1px solid var(--border);
-    border-right: 1px solid var(--border);
+    border-left: 1px solid var(--vw-border);
+    border-right: 1px solid var(--vw-border);
 }
 
 .event-count {
     font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
 }
 
 .events-container {
     background:
-        radial-gradient(ellipse at top left, rgba(0, 212, 255, 0.08) 0%, transparent 50%),
-        radial-gradient(ellipse at bottom right, rgba(157, 124, 216, 0.08) 0%, transparent 50%),
-        var(--bg-primary);
+        radial-gradient(ellipse at top left, var(--vw-cyan-bg) 0%, transparent 50%),
+        radial-gradient(ellipse at bottom right, var(--vw-purple-subtle) 0%, transparent 50%),
+        var(--vw-bg-deep);
 }
 
 /* Events Table */
@@ -602,7 +609,7 @@ button:hover {
 }
 
 .events-table thead {
-    background: var(--bg-secondary);
+    background: var(--vw-bg-card);
     position: sticky;
     top: 0;
     z-index: 10;
@@ -612,16 +619,16 @@ button:hover {
     padding: 0.625rem 0.75rem;
     text-align: left;
     font-weight: 600;
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
     text-transform: uppercase;
     font-size: var(--text-xs);
     letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--vw-border);
 }
 
 .events-table td {
     padding: 0.625rem 0.75rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--vw-border);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -641,19 +648,19 @@ button:hover {
 }
 
 .event-row:hover {
-    background: var(--bg-elevated);
+    background: var(--vw-bg-elevated);
 }
 
 .event-row.selected {
-    background: var(--cyan-subtle);
+    background: var(--vw-cyan-subtle);
 }
 
 .event-row[data-level="error"] {
-    border-left: 3px solid var(--red);
+    border-left: 3px solid var(--vw-danger);
 }
 
 .event-row[data-level="warn"] {
-    border-left: 3px solid var(--yellow);
+    border-left: 3px solid var(--vw-warning);
 }
 
 /* Badges */
@@ -667,31 +674,31 @@ button:hover {
 }
 
 .level-badge.debug {
-    background: rgba(96, 96, 112, 0.2);
-    color: var(--text-tertiary);
+    background: rgba(102, 102, 102, 0.2);
+    color: var(--vw-gray);
 }
 
 .level-badge.info {
-    background: rgba(0, 255, 136, 0.15);
-    color: var(--green);
+    background: rgba(74, 158, 107, 0.15);
+    color: var(--vw-success);
 }
 
 .level-badge.warn {
-    background: rgba(255, 215, 0, 0.15);
-    color: var(--yellow);
+    background: rgba(166, 138, 77, 0.15);
+    color: var(--vw-warning);
 }
 
 .level-badge.error {
-    background: rgba(255, 92, 92, 0.15);
-    color: var(--red);
+    background: rgba(166, 93, 109, 0.15);
+    color: var(--vw-danger);
 }
 
 .source-badge {
     display: inline-block;
     padding: 0.125rem 0.375rem;
     border-radius: 3px;
-    background: var(--cyan-subtle);
-    color: var(--cyan);
+    background: var(--vw-cyan-subtle);
+    color: var(--vw-cyan);
     font-size: var(--text-xs);
     font-weight: 500;
 }
@@ -699,19 +706,19 @@ button:hover {
 /* Right Panel: Detail */
 .right-panel {
     grid-area: right;
-    border-left: 1px solid var(--border-accent);
+    border-left: 1px solid var(--vw-border-accent);
     transition: opacity var(--transition-normal);
 }
 
 .right-panel .panel-header {
-    background: var(--bg-secondary);
+    background: var(--vw-bg-card);
 }
 
 .right-panel .close-btn {
     background: transparent;
     border: none;
     font-size: 1.5rem;
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
     padding: 0;
     width: 2rem;
     height: 2rem;
@@ -722,7 +729,7 @@ button:hover {
 }
 
 .right-panel .close-btn:hover {
-    color: var(--cyan);
+    color: var(--vw-cyan);
     background: transparent;
     box-shadow: none;
 }
@@ -737,7 +744,7 @@ button:hover {
     align-items: center;
     justify-content: center;
     height: 200px;
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
     text-align: center;
 }
 
@@ -772,7 +779,7 @@ button:hover {
 }
 
 .detail-fields dt {
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
     font-weight: 600;
     text-transform: uppercase;
     font-size: var(--text-xs);
@@ -780,35 +787,35 @@ button:hover {
 }
 
 .detail-fields dd {
-    color: var(--text-primary);
+    color: var(--vw-text);
     word-break: break-word;
 }
 
 .detail-data h3 {
     font-size: var(--text-xs);
-    color: var(--text-tertiary);
+    color: var(--vw-gray);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: 0.5rem;
 }
 
 .detail-data pre {
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
+    background: var(--vw-bg-deep);
+    border: 1px solid var(--vw-border);
     border-radius: 4px;
     padding: 0.75rem;
     overflow-x: auto;
     font-size: var(--text-xs);
-    color: var(--text-primary);
+    color: var(--vw-text);
     max-height: 300px;
 }
 
 /* JSON Syntax Highlighting */
-.json-key { color: var(--cyan); }
-.json-string { color: var(--text-primary); }
-.json-number { color: #f5a623; }
-.json-boolean { color: var(--purple); }
-.json-null { color: var(--text-tertiary); }
+.json-key { color: var(--vw-cyan); }
+.json-string { color: var(--vw-text); }
+.json-number { color: var(--vw-warning); }
+.json-boolean { color: var(--vw-purple); }
+.json-null { color: var(--vw-gray); }
 
 /* ========================================
    RESPONSIVE
@@ -864,22 +871,22 @@ button:hover {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--bg-primary);
+    background: var(--vw-bg-deep);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border-bright);
+    background: var(--vw-border-bright);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--cyan-dim);
+    background: var(--vw-cyan-dim);
 }
 
 /* Firefox */
 * {
     scrollbar-width: thin;
-    scrollbar-color: var(--border-bright) var(--bg-primary);
+    scrollbar-color: var(--vw-border-bright) var(--vw-bg-deep);
 }
 
 /* ========================================
