@@ -229,6 +229,22 @@ button:hover {
     letter-spacing: 0.1em;
 }
 
+.show-ended-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: var(--text-xs);
+    color: var(--vw-gray);
+    cursor: pointer;
+    margin-left: auto;
+    margin-right: 0.75rem;
+}
+
+.show-ended-toggle input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--vw-cyan);
+}
+
 .panel-content {
     flex: 1;
     overflow-y: auto;

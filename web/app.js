@@ -92,6 +92,7 @@ function cacheElements() {
   elements.sessionTree = document.getElementById("session-tree");
   elements.sessionCount = document.getElementById("session-count");
   elements.treeEmpty = document.getElementById("tree-empty");
+  elements.showEnded = document.getElementById("show-ended");
 }
 
 // Initialize event listeners
@@ -206,6 +207,11 @@ function initializeEventListeners() {
       clearAgentTreeSelection();
     }
     applyFilters();
+  });
+
+  // Show ended sessions toggle
+  elements.showEnded.addEventListener("change", () => {
+    filterSessionTreeVisibility();
   });
 }
 
@@ -369,10 +375,8 @@ function handleSessionStarted(session) {
     elements.sessionTree.appendChild(sessionElement);
   }
 
-  // Update session count
-  const sessionCount =
-    elements.sessionTree.querySelectorAll(".tree-item.session").length;
-  updateSessionCount(sessionCount);
+  // Reapply visibility filter (updates count too)
+  filterSessionTreeVisibility();
 
   // Refresh session dropdown
   loadSessionOptions();
@@ -393,6 +397,9 @@ function handleSessionEnded(session) {
     statusDot.classList.remove("active");
     statusDot.classList.add("ended");
   }
+
+  // Reapply visibility filter (hides session if "Show ended" is unchecked)
+  filterSessionTreeVisibility();
 
   // Refresh session dropdown to update status indicator
   loadSessionOptions();
@@ -1507,4 +1514,37 @@ function clearAgentTreeSelection() {
 // Update session count badge
 function updateSessionCount(count) {
   elements.sessionCount.textContent = count;
+}
+
+// Filter session tree visibility based on "Show ended" checkbox
+function filterSessionTreeVisibility() {
+  const showEnded = elements.showEnded.checked;
+  const sessions = elements.sessionTree.querySelectorAll(".tree-item.session");
+
+  let visibleCount = 0;
+  sessions.forEach((session) => {
+    const statusDot = session.querySelector(".status-dot");
+    const isEnded = statusDot?.classList.contains("ended");
+
+    if (!showEnded && isEnded) {
+      session.style.display = "none";
+    } else {
+      session.style.display = "";
+      visibleCount++;
+    }
+  });
+
+  // Update count to reflect visible sessions
+  updateSessionCount(visibleCount);
+
+  // Show/hide empty state based on visible count
+  if (visibleCount === 0 && sessions.length > 0) {
+    elements.treeEmpty.style.display = "";
+    elements.treeEmpty.querySelector("p").textContent = "No active sessions";
+  } else if (visibleCount === 0) {
+    elements.treeEmpty.style.display = "";
+    elements.treeEmpty.querySelector("p").textContent = "No sessions";
+  } else {
+    elements.treeEmpty.style.display = "none";
+  }
 }
