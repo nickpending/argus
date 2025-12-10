@@ -439,6 +439,18 @@ button:hover {
     font-size: var(--text-xs);
 }
 
+/* Nested agents (agent children) - subtle depth indication */
+.tree-item.agent .tree-children {
+    border-left-color: var(--vw-dark-gray);
+    margin-left: 0.5rem;
+    padding-left: 1rem;
+}
+
+/* Deeper nesting - progressively muted */
+.tree-item.agent .tree-item.agent .tree-toggle {
+    opacity: 0.85;
+}
+
 .filter-group {
     margin-bottom: 1.25rem;
 }

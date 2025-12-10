@@ -1344,11 +1344,18 @@ function createSessionElement(session, agents) {
     ${hasAgents ? '<div class="tree-children"></div>' : ""}
   `;
 
-  // Add agents to children container
+  // Add agents to children container (with hierarchy support)
   if (hasAgents) {
     const childrenContainer = item.querySelector(".tree-children");
-    agents.forEach((agent) => {
-      const agentElement = createAgentElement(agent, session.id);
+    const { rootAgents, childrenMap } = buildAgentHierarchy(agents);
+    rootAgents.forEach((agent) => {
+      const children = childrenMap[agent.id] || [];
+      const agentElement = createAgentElement(
+        agent,
+        session.id,
+        children,
+        childrenMap,
+      );
       childrenContainer.appendChild(agentElement);
     });
 
@@ -1373,7 +1380,8 @@ function createSessionElement(session, agents) {
 }
 
 // Create agent tree item element
-function createAgentElement(agent, sessionId) {
+// children: array of child agents (from childrenMap), childrenMap: for recursive nesting
+function createAgentElement(agent, sessionId, children = [], childrenMap = {}) {
   const item = document.createElement("div");
   item.className = "tree-item agent";
   item.dataset.agentId = agent.id;
@@ -1394,17 +1402,49 @@ function createAgentElement(agent, sessionId) {
   const eventCount = agent.event_count || 0;
   const eventText = eventCount === 1 ? "1 event" : `${eventCount} events`;
 
+  // Has children to expand?
+  const hasChildren = children.length > 0;
+  const expandedAttr = hasChildren ? 'aria-expanded="false"' : "";
+  const leafClass = hasChildren ? "" : " leaf";
+
   item.innerHTML = `
-    <button class="tree-toggle leaf">
+    <button class="tree-toggle${leafClass}" ${expandedAttr}>
+      ${hasChildren ? '<span class="toggle-icon"></span>' : ""}
       <span class="status-dot ${statusClass}"></span>
       <span class="tree-label">${escapeHtml(label)}</span>
       <span class="tree-meta">${escapeHtml(eventText)}</span>
     </button>
+    ${hasChildren ? '<div class="tree-children"></div>' : ""}
   `;
 
-  // Add filter click handler
+  // Add child agents to children container (recursive)
+  if (hasChildren) {
+    const childrenContainer = item.querySelector(".tree-children");
+    children.forEach((childAgent) => {
+      const grandchildren = childrenMap[childAgent.id] || [];
+      const childElement = createAgentElement(
+        childAgent,
+        sessionId,
+        grandchildren,
+        childrenMap,
+      );
+      childrenContainer.appendChild(childElement);
+    });
+
+    // Add expand/collapse handler to toggle icon only
+    const toggleIcon = item.querySelector(".toggle-icon");
+    if (toggleIcon) {
+      toggleIcon.addEventListener("click", handleTreeToggle);
+    }
+  }
+
+  // Add filter click handler to the button (entire row)
   const toggleButton = item.querySelector(".tree-toggle");
-  toggleButton.addEventListener("click", () => {
+  toggleButton.addEventListener("click", (event) => {
+    // Ignore if clicking on toggle icon (handled separately)
+    if (event.target.classList.contains("toggle-icon")) {
+      return;
+    }
     handleAgentClick(agent.id, sessionId, item);
   });
 
