@@ -1220,6 +1220,31 @@ function exportCsv() {
   console.log(`Exported ${visibleRows.length} events to CSV`);
 }
 
+// Build agent hierarchy from flat list for nested tree display
+// Returns { rootAgents: [...], childrenMap: { parentId: [children] } }
+function buildAgentHierarchy(agents) {
+  const rootAgents = [];
+  const childrenMap = {};
+  const agentIds = new Set(agents.map((a) => a.id));
+
+  agents.forEach((agent) => {
+    const parentId = agent.parent_agent_id;
+
+    if (parentId && agentIds.has(parentId)) {
+      // Valid parent exists - add to children map
+      if (!childrenMap[parentId]) {
+        childrenMap[parentId] = [];
+      }
+      childrenMap[parentId].push(agent);
+    } else {
+      // No parent or parent not found - treat as root agent
+      rootAgents.push(agent);
+    }
+  });
+
+  return { rootAgents, childrenMap };
+}
+
 // Load session tree from API
 async function loadSessionTree() {
   try {
