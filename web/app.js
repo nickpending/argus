@@ -423,15 +423,33 @@ function handleAgentStarted(agent) {
     return;
   }
 
-  // Get or create children container
-  let childrenContainer = sessionElement.querySelector(".tree-children");
-  const toggleButton = sessionElement.querySelector(".tree-toggle");
+  // Determine insertion target: parent agent or session
+  let targetElement = sessionElement;
+  let isNestedUnderAgent = false;
+
+  if (agent.parent_agent_id) {
+    // Try to find parent agent in DOM
+    const parentAgentElement = sessionElement.querySelector(
+      `.tree-item.agent[data-agent-id="${agent.parent_agent_id}"]`,
+    );
+    if (parentAgentElement) {
+      targetElement = parentAgentElement;
+      isNestedUnderAgent = true;
+    }
+    // If parent not found, fall back to session (race condition handling)
+  }
+
+  // Get or create children container on target
+  let childrenContainer = targetElement.querySelector(
+    ":scope > .tree-children",
+  );
+  const toggleButton = targetElement.querySelector(":scope > .tree-toggle");
 
   if (!childrenContainer) {
-    // Session was a leaf - need to add expand functionality
+    // Target was a leaf - need to add expand functionality
     childrenContainer = document.createElement("div");
     childrenContainer.className = "tree-children";
-    sessionElement.appendChild(childrenContainer);
+    targetElement.appendChild(childrenContainer);
 
     // Add toggle icon to button
     toggleButton.classList.remove("leaf");
@@ -442,21 +460,42 @@ function handleAgentStarted(agent) {
     toggleButton.insertBefore(toggleIcon, toggleButton.firstChild);
   }
 
-  // Create agent element
+  // Create agent element (as leaf - no children yet)
   const agentElement = createAgentElement(agent, agent.session_id);
   childrenContainer.appendChild(agentElement);
 
-  // Update agent count in session meta
-  const agentCount =
-    childrenContainer.querySelectorAll(".tree-item.agent").length;
-  const metaSpan = sessionElement.querySelector(".tree-meta");
-  if (metaSpan) {
-    metaSpan.textContent =
-      agentCount === 1 ? "1 agent" : `${agentCount} agents`;
+  // Update counts based on where agent was inserted
+  if (isNestedUnderAgent) {
+    // Update parent agent's child count (optional - agents show event count, not child count)
+    // Auto-expand parent agent to show new child
+    toggleButton.setAttribute("aria-expanded", "true");
+  } else {
+    // Update session's agent count (total agents, including nested)
+    const agentCount =
+      sessionElement.querySelectorAll(".tree-item.agent").length;
+    const metaSpan = sessionElement.querySelector(
+      ":scope > .tree-toggle .tree-meta",
+    );
+    if (metaSpan) {
+      metaSpan.textContent =
+        agentCount === 1 ? "1 agent" : `${agentCount} agents`;
+    }
+    // Auto-expand session to show new agent
+    toggleButton.setAttribute("aria-expanded", "true");
   }
 
-  // Auto-expand session to show new agent
-  toggleButton.setAttribute("aria-expanded", "true");
+  // Always update session agent count (total includes nested)
+  if (isNestedUnderAgent) {
+    const totalAgents =
+      sessionElement.querySelectorAll(".tree-item.agent").length;
+    const sessionMeta = sessionElement.querySelector(
+      ":scope > .tree-toggle .tree-meta",
+    );
+    if (sessionMeta) {
+      sessionMeta.textContent =
+        totalAgents === 1 ? "1 agent" : `${totalAgents} agents`;
+    }
+  }
 
   // Refresh agent dropdown if this session is selected
   if (state.selectedSessionId === agent.session_id) {
