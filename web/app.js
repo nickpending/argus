@@ -456,7 +456,6 @@ function handleAgentStarted(agent) {
     toggleButton.setAttribute("aria-expanded", "false");
     const toggleIcon = document.createElement("span");
     toggleIcon.className = "toggle-icon";
-    toggleIcon.addEventListener("click", handleTreeToggle);
     toggleButton.insertBefore(toggleIcon, toggleButton.firstChild);
   }
 
@@ -634,6 +633,60 @@ function hideEventDetail() {
 
   state.selectedEventId = null;
   elements.rightPanel.classList.remove("has-selection");
+}
+
+// Show agent detail panel when agent clicked in tree
+async function showAgentDetails(agentId, sessionId) {
+  try {
+    const response = await fetch(`/agents?session_id=${sessionId}`);
+    if (!response.ok) {
+      console.error("Failed to fetch agent details:", response.status);
+      return;
+    }
+
+    const data = await response.json();
+    const agent = data.agents?.find((a) => a.id === agentId);
+
+    if (!agent) {
+      console.warn("Agent not found:", agentId);
+      return;
+    }
+
+    // Clear any event row selection
+    const selectedRow = elements.eventsBody.querySelector(
+      ".event-row.selected",
+    );
+    if (selectedRow) {
+      selectedRow.classList.remove("selected");
+    }
+    state.selectedEventId = null;
+
+    // Populate detail fields with agent info
+    elements.detailId.textContent = agent.id;
+    elements.detailSource.textContent = agent.type || "-";
+    elements.detailType.textContent = agent.name || agent.type || "agent";
+    elements.detailTimestamp.textContent = agent.created_at || "-";
+    elements.detailLevel.textContent = agent.status || "-";
+    elements.detailMessage.textContent = agent.completed_at
+      ? `Completed: ${agent.completed_at}`
+      : "Running...";
+
+    // Show agent metadata as JSON
+    const agentData = {
+      session_id: agent.session_id,
+      parent_agent_id: agent.parent_agent_id,
+      event_count: agent.event_count,
+      status: agent.status,
+      created_at: agent.created_at,
+      completed_at: agent.completed_at,
+    };
+    elements.detailDataJson.innerHTML = highlightJson(agentData);
+
+    // Show detail view
+    elements.rightPanel.classList.add("has-selection");
+  } catch (error) {
+    console.error("Error fetching agent details:", error);
+  }
 }
 
 // Format timestamp for display
@@ -1397,21 +1450,11 @@ function createSessionElement(session, agents) {
       );
       childrenContainer.appendChild(agentElement);
     });
-
-    // Add expand/collapse handler to toggle icon only
-    const toggleIcon = item.querySelector(".toggle-icon");
-    if (toggleIcon) {
-      toggleIcon.addEventListener("click", handleTreeToggle);
-    }
   }
 
-  // Add filter click handler to the button (entire row)
+  // Single click handler for entire row - expands and selects
   const toggleButton = item.querySelector(".tree-toggle");
-  toggleButton.addEventListener("click", (event) => {
-    // Ignore if clicking on toggle icon (handled separately)
-    if (event.target.classList.contains("toggle-icon")) {
-      return;
-    }
+  toggleButton.addEventListener("click", () => {
     handleSessionClick(session.id, item);
   });
 
@@ -1469,73 +1512,76 @@ function createAgentElement(agent, sessionId, children = [], childrenMap = {}) {
       );
       childrenContainer.appendChild(childElement);
     });
-
-    // Add expand/collapse handler to toggle icon only
-    const toggleIcon = item.querySelector(".toggle-icon");
-    if (toggleIcon) {
-      toggleIcon.addEventListener("click", handleTreeToggle);
-    }
   }
 
-  // Add filter click handler to the button (entire row)
+  // Single click handler for entire row - expands and selects
   const toggleButton = item.querySelector(".tree-toggle");
-  toggleButton.addEventListener("click", (event) => {
-    // Ignore if clicking on toggle icon (handled separately)
-    if (event.target.classList.contains("toggle-icon")) {
-      return;
-    }
+  toggleButton.addEventListener("click", () => {
     handleAgentClick(agent.id, sessionId, item);
   });
 
   return item;
 }
 
-// Handle tree toggle click (expand/collapse)
-function handleTreeToggle(event) {
-  event.stopPropagation(); // Prevent triggering filter click
-  const toggleIcon = event.currentTarget;
-  const button = toggleIcon.closest(".tree-toggle");
-  const isExpanded = button.getAttribute("aria-expanded") === "true";
-  button.setAttribute("aria-expanded", !isExpanded);
-}
-
-// Handle session click for filtering
+// Handle session click - select, filter, and toggle expand
 function handleSessionClick(sessionId, treeItem) {
-  // Toggle selection - if already selected, deselect
-  if (state.selectedSessionId === sessionId && !state.selectedAgentId) {
-    clearTreeSelection();
-    loadAgentOptions(null); // Clear agent dropdown
+  const toggleBtn = treeItem.querySelector(":scope > .tree-toggle");
+  const isExpanded = toggleBtn?.getAttribute("aria-expanded") === "true";
+  const isSelected =
+    state.selectedSessionId === sessionId && !state.selectedAgentId;
+
+  if (isSelected) {
+    // Already selected - toggle expand/collapse
+    if (toggleBtn?.hasAttribute("aria-expanded")) {
+      toggleBtn.setAttribute("aria-expanded", !isExpanded);
+    }
   } else {
-    // Clear previous selection and select this session
+    // New selection - select, expand, and filter
     clearTreeSelection();
     state.selectedSessionId = sessionId;
     state.selectedAgentId = null;
     treeItem.classList.add("selected");
-    // Sync dropdowns to match tree selection
+    // Expand if has children
+    if (toggleBtn?.hasAttribute("aria-expanded")) {
+      toggleBtn.setAttribute("aria-expanded", "true");
+    }
+    // Sync dropdowns
     syncDropdownToTree(sessionId);
     loadAgentOptions(sessionId);
+    applyFilters();
   }
-  applyFilters();
 }
 
-// Handle agent click for filtering
+// Handle agent click - select, filter, show details, and toggle expand
 function handleAgentClick(agentId, sessionId, treeItem) {
-  // Toggle selection - if already selected, deselect
-  if (state.selectedAgentId === agentId) {
-    clearTreeSelection();
+  const toggleBtn = treeItem.querySelector(":scope > .tree-toggle");
+  const isExpanded = toggleBtn?.getAttribute("aria-expanded") === "true";
+  const isSelected = state.selectedAgentId === agentId;
+
+  if (isSelected) {
+    // Already selected - toggle expand/collapse
+    if (toggleBtn?.hasAttribute("aria-expanded")) {
+      toggleBtn.setAttribute("aria-expanded", !isExpanded);
+    }
   } else {
-    // Clear previous selection and select this agent (and its session)
+    // New selection - select, expand, filter, show details
     clearTreeSelection();
     state.selectedSessionId = sessionId;
     state.selectedAgentId = agentId;
     treeItem.classList.add("selected");
-    // Sync dropdowns to match tree selection
+    // Expand if has children
+    if (toggleBtn?.hasAttribute("aria-expanded")) {
+      toggleBtn.setAttribute("aria-expanded", "true");
+    }
+    // Sync dropdowns
     syncDropdownToTree(sessionId);
     loadAgentOptions(sessionId).then(() => {
       syncAgentDropdownToTree(agentId);
     });
+    // Show agent details in right panel
+    showAgentDetails(agentId, sessionId);
+    applyFilters();
   }
-  applyFilters();
 }
 
 // Clear tree selection visual state and filter state

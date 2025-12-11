@@ -330,10 +330,11 @@ button:hover {
     align-items: center;
     gap: 0.5rem;
     width: 100%;
-    padding: 0.5rem 0.625rem;
+    padding: 0.625rem 0.75rem;
+    min-height: 2.25rem;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 3px;
+    border-radius: 4px;
     color: var(--vw-text);
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -359,18 +360,24 @@ button:hover {
 
 /* Toggle Icon (expand/collapse arrow) */
 .toggle-icon {
-    width: 12px;
-    height: 12px;
+    width: 1.25rem;
+    height: 1.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--vw-gray);
     transition: transform var(--transition-fast);
+    border-radius: 3px;
+}
+
+.toggle-icon:hover {
+    background: var(--vw-bg-deep);
+    color: var(--vw-text);
 }
 
 .toggle-icon::before {
     content: '▸';
-    font-size: 10px;
+    font-size: 0.75rem;
 }
 
 .tree-toggle[aria-expanded="true"] .toggle-icon::before {
@@ -433,9 +440,10 @@ button:hover {
     display: block;
 }
 
-/* Agent items are slightly smaller */
+/* Agent items - same click target, slightly smaller text */
 .tree-item.agent .tree-toggle {
-    padding: 0.375rem 0.5rem;
+    padding: 0.5rem 0.625rem;
+    min-height: 2rem;
     font-size: var(--text-xs);
 }
 
