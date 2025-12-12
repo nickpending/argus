@@ -121,6 +121,7 @@ class EventCreate(BaseModel):
             "SessionEnd",
             "SubagentStart",
             "SubagentStop",
+            "SubagentActivated",
             "UserPromptSubmit",
         ]
         | None
@@ -129,10 +130,13 @@ class EventCreate(BaseModel):
     tool_use_id: str | None = Field(
         default=None, description="Correlates PreToolUse/PostToolUse pairs"
     )
-    status: Literal["success", "failure", "pending"] | None = Field(
+    status: Literal["success", "failure", "pending", "activated"] | None = Field(
         default=None, description="Event outcome"
     )
     agent_id: str | None = Field(default=None, description="Links event to agent instance")
+    is_background: bool | None = Field(
+        default=None, description="Whether this is a background tool/agent execution"
+    )
 
     @field_validator("source")
     @classmethod

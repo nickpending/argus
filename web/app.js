@@ -267,6 +267,9 @@ function handleMessage(event) {
       case "agent_started":
         handleAgentStarted(message.payload);
         break;
+      case "agent_activated":
+        handleAgentActivated(message.payload);
+        break;
       case "agent_completed":
         handleAgentCompleted(message.payload);
         break;
@@ -407,11 +410,13 @@ function handleSessionEnded(session) {
 
 // Handle agent started lifecycle event
 function handleAgentStarted(agent) {
+  console.log("agent_started received:", agent);
   // Find parent session in tree
   const sessionElement = elements.sessionTree.querySelector(
     `.tree-item.session[data-session-id="${agent.session_id}"]`,
   );
   if (!sessionElement) {
+    console.warn("agent_started: session not found in tree:", agent.session_id);
     return;
   }
 
@@ -451,12 +456,9 @@ function handleAgentStarted(agent) {
     childrenContainer.className = "tree-children";
     targetElement.appendChild(childrenContainer);
 
-    // Add toggle icon to button
+    // Enable expand functionality (toggle-icon already exists, just hidden via CSS)
     toggleButton.classList.remove("leaf");
     toggleButton.setAttribute("aria-expanded", "false");
-    const toggleIcon = document.createElement("span");
-    toggleIcon.className = "toggle-icon";
-    toggleButton.insertBefore(toggleIcon, toggleButton.firstChild);
   }
 
   // Create agent element (as leaf - no children yet)
@@ -500,6 +502,47 @@ function handleAgentStarted(agent) {
   if (state.selectedSessionId === agent.session_id) {
     loadAgentOptions(agent.session_id);
   }
+}
+
+// Handle agent activated lifecycle event
+// Updates pending agent's ID from tool_use_id to real agent_id
+function handleAgentActivated(agent) {
+  const oldId = agent.old_id;
+  const newId = agent.id;
+
+  console.log("agent_activated received:", { oldId, newId, agent });
+
+  // Find agent element by old ID (the tool_use_id)
+  const agentElement = elements.sessionTree.querySelector(
+    `.tree-item.agent[data-agent-id="${oldId}"]`,
+  );
+  if (!agentElement) {
+    console.warn("agent_activated: agent not found with old_id:", oldId);
+    return;
+  }
+
+  // Update the data-agent-id attribute to the real ID
+  agentElement.setAttribute("data-agent-id", newId);
+
+  // Update ID display in the tree item if shown
+  const idSpan = agentElement.querySelector(".agent-id");
+  if (idSpan) {
+    idSpan.textContent = newId;
+  }
+
+  // If this agent is currently selected, update the filter state
+  if (state.selectedAgentId === oldId) {
+    state.selectedAgentId = newId;
+    // Re-apply filters with new ID so events start streaming correctly
+    applyFilters();
+  }
+
+  // Refresh agent dropdown if this session is selected
+  if (state.selectedSessionId === agent.session_id) {
+    loadAgentOptions(agent.session_id);
+  }
+
+  console.log("Agent activated:", oldId, "->", newId);
 }
 
 // Handle agent completed lifecycle event
@@ -872,11 +915,17 @@ function applyFilters() {
   const filters = collectFilters();
   state.currentFilters = filters;
 
-  // If time range filter is active, fetch historical events from API
-  if (filters.time_since || filters.time_until) {
+  // Fetch from API when filters require server-side filtering
+  // (time range, session, or agent filters need historical data)
+  if (
+    filters.time_since ||
+    filters.time_until ||
+    filters.session_id ||
+    filters.agent_id
+  ) {
     fetchHistoricalEvents(filters);
   } else {
-    // No time filter - just filter existing DOM rows
+    // No server-side filter - just filter existing DOM rows
     filterTableRows(filters);
     updateEventCount();
   }
@@ -1428,7 +1477,7 @@ function createSessionElement(session, agents) {
 
   item.innerHTML = `
     <button class="tree-toggle${leafClass}" ${expandedAttr}>
-      ${hasAgents ? '<span class="toggle-icon"></span>' : ""}
+      <span class="toggle-icon"></span>
       <span class="status-dot ${statusClass}"></span>
       <span class="tree-label">${escapeHtml(label)}</span>
       <span class="tree-meta">${escapeHtml(agentText)}</span>
@@ -1491,7 +1540,7 @@ function createAgentElement(agent, sessionId, children = [], childrenMap = {}) {
 
   item.innerHTML = `
     <button class="tree-toggle${leafClass}" ${expandedAttr}>
-      ${hasChildren ? '<span class="toggle-icon"></span>' : ""}
+      <span class="toggle-icon"></span>
       <span class="status-dot ${statusClass}"></span>
       <span class="tree-label">${escapeHtml(label)}</span>
       <span class="tree-meta">${escapeHtml(eventText)}</span>

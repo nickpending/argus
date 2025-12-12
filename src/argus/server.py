@@ -238,9 +238,61 @@ async def create_event(
             logger.warning("SessionEnd event missing session_id, skipping session update")
 
     # Handle agent lifecycle events
+    # New flow: PreToolUse (pending) -> PostToolUse (completion) with tool_use_id correlation
+    event_type = event_dict.get("event_type")
     agent_id = event_dict.get("agent_id")
+    tool_use_id = event_dict.get("tool_use_id")
 
-    if hook == "SubagentStart":
+    if event_type == "agent" and hook == "PreToolUse":
+        # Agent starting - create pending record keyed by tool_use_id
+        if tool_use_id and session_id:
+            data = event_dict.get("data") or {}
+            agent_type = data.get("subagent_type", "subagent")
+            name = data.get("description")
+            parent_agent_id = data.get("parent_agent_id")
+            created = db.create_pending_agent(
+                tool_use_id, session_id, agent_type, name, parent_agent_id
+            )
+            logger.info(f"Agent PreToolUse: created={created} tool_use_id={tool_use_id}")
+            # Broadcast agent lifecycle to UI (using tool_use_id as temporary id)
+            agent_data = db.get_agent_by_tool_use_id(tool_use_id)
+            if agent_data:
+                logger.info(f"Broadcasting agent_started: {agent_data.get('id')}")
+                asyncio.create_task(ws_manager.broadcast_lifecycle("agent_started", agent_data))
+            else:
+                logger.warning(
+                    f"Agent PreToolUse: get_agent_by_tool_use_id returned None for {tool_use_id}"
+                )
+        else:
+            if not tool_use_id:
+                logger.warning(
+                    "Agent PreToolUse event missing tool_use_id, skipping agent creation"
+                )
+            if not session_id:
+                logger.warning("Agent PreToolUse event missing session_id, skipping agent creation")
+
+    elif event_type == "agent" and hook == "PostToolUse":
+        # Agent completed - correlate tool_use_id to set real agent_id
+        if tool_use_id and agent_id:
+            event_status = event_dict.get("status", "success")
+            final_status = "completed" if event_status == "success" else "failed"
+            if db.complete_agent_by_tool_use_id(tool_use_id, agent_id, final_status):
+                # Broadcast agent lifecycle to UI (now with real agent_id)
+                agent_data = db.get_agent_by_id(agent_id)
+                if agent_data:
+                    asyncio.create_task(
+                        ws_manager.broadcast_lifecycle("agent_completed", agent_data)
+                    )
+            else:
+                logger.warning(f"Agent PostToolUse for unknown tool_use_id: {tool_use_id}")
+        else:
+            if not tool_use_id:
+                logger.warning("Agent PostToolUse event missing tool_use_id, skipping agent update")
+            if not agent_id:
+                logger.warning("Agent PostToolUse event missing agent_id, skipping agent update")
+
+    # Legacy SubagentStart/SubagentStop handlers (keep for backwards compatibility)
+    elif hook == "SubagentStart":
         if agent_id and session_id:
             data = event_dict.get("data") or {}
             agent_type = data.get("type", "subagent")
@@ -273,6 +325,28 @@ async def create_event(
         else:
             logger.warning("SubagentStop event missing agent_id, skipping agent update")
 
+    elif hook == "SubagentActivated":
+        # Activation event correlates pending agent (by tool_use_id) with real agent_id
+        # Sent by Momentum when first tool inside subagent fires
+        if tool_use_id and agent_id:
+            if db.activate_pending_agent(tool_use_id, agent_id):
+                logger.info(f"Activated pending agent: {tool_use_id} -> {agent_id}")
+                # Broadcast activation to UI with both IDs for tree update
+                agent_data = db.get_agent_by_id(agent_id)
+                if agent_data:
+                    # Include old ID so UI can find and update the element
+                    agent_data["old_id"] = tool_use_id
+                    asyncio.create_task(
+                        ws_manager.broadcast_lifecycle("agent_activated", agent_data)
+                    )
+            else:
+                logger.warning(f"SubagentActivated: no pending agent for tool_use_id={tool_use_id}")
+        else:
+            if not tool_use_id:
+                logger.warning("SubagentActivated missing tool_use_id")
+            if not agent_id:
+                logger.warning("SubagentActivated missing agent_id")
+
     # Store event in database
     event_id = db.store_event(event_dict)
 
@@ -286,6 +360,13 @@ async def create_event(
         "message": event_dict.get("message"),
         "level": event_dict.get("level"),
         "data": event_dict.get("data"),
+        "session_id": event_dict.get("session_id"),
+        "hook": event_dict.get("hook"),
+        "tool_name": event_dict.get("tool_name"),
+        "tool_use_id": event_dict.get("tool_use_id"),
+        "status": event_dict.get("status"),
+        "agent_id": event_dict.get("agent_id"),
+        "is_background": event_dict.get("is_background"),
     }
     # Broadcast in background task to avoid blocking response
     asyncio.create_task(ws_manager.broadcast(broadcast_event))

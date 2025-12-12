@@ -68,9 +68,11 @@ class Database:
             """)
 
             # Agents table for agent/subagent tracking
+            # Note: id can be tool_use_id initially (pending), updated to agent_id on completion
             self.conn.execute("""
                 CREATE TABLE IF NOT EXISTS agents (
                     id TEXT PRIMARY KEY,
+                    tool_use_id TEXT,
                     type TEXT NOT NULL,
                     name TEXT,
                     session_id TEXT NOT NULL,
@@ -117,6 +119,7 @@ class Database:
             ("tool_use_id", "TEXT"),
             ("status", "TEXT"),
             ("agent_id", "TEXT"),
+            ("is_background", "INTEGER"),  # SQLite uses INTEGER for booleans
         ]
 
         with self.conn:
@@ -139,6 +142,15 @@ class Database:
                   AND data IS NOT NULL
                   AND json_extract(data, '$.session_id') IS NOT NULL
             """)
+
+        # Migration: add tool_use_id column to agents table
+        existing_agents_cols = self._get_existing_columns("agents")
+        if "tool_use_id" not in existing_agents_cols:
+            with self.conn:
+                self.conn.execute("ALTER TABLE agents ADD COLUMN tool_use_id TEXT")
+                self.conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_agents_tool_use_id ON agents(tool_use_id)"
+                )
 
     def get_journal_mode(self) -> str:
         """Get current journal mode (for verification).
@@ -173,13 +185,17 @@ class Database:
         # Insert event with thread lock for concurrent safety
         with self._lock:
             with self.conn:
+                # Convert is_background bool to SQLite INTEGER (1/0/NULL)
+                is_background = event.get("is_background")
+                is_background_int = 1 if is_background else (0 if is_background is False else None)
+
                 cursor = self.conn.execute(
                     """
                     INSERT INTO events (
                         source, event_type, timestamp, message, level, data,
-                        session_id, hook, tool_name, tool_use_id, status, agent_id
+                        session_id, hook, tool_name, tool_use_id, status, agent_id, is_background
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         event["source"],
@@ -194,6 +210,7 @@ class Database:
                         event.get("tool_use_id"),
                         event.get("status"),
                         event.get("agent_id"),
+                        is_background_int,
                     ),
                 )
                 event_id = cursor.lastrowid
@@ -271,7 +288,7 @@ class Database:
         # Build query with parameterized values only
         base_query = (
             "SELECT id, source, event_type, timestamp, message, level, data, created_at, "
-            "session_id, hook, tool_name, tool_use_id, status, agent_id FROM events"
+            "session_id, hook, tool_name, tool_use_id, status, agent_id, is_background FROM events"
         )
 
         if where_clauses:
@@ -304,6 +321,7 @@ class Database:
                 "tool_use_id": row[11],
                 "status": row[12],
                 "agent_id": row[13],
+                "is_background": bool(row[14]) if row[14] is not None else None,
             }
             events.append(event)
 
@@ -513,6 +531,7 @@ class Database:
         agent_type: str = "subagent",
         name: str | None = None,
         parent_agent_id: str | None = None,
+        tool_use_id: str | None = None,
     ) -> bool:
         """Create agent record if not exists (idempotent).
 
@@ -522,6 +541,7 @@ class Database:
             agent_type: Agent type (e.g., 'subagent', 'agent')
             name: Human-readable agent name
             parent_agent_id: Parent agent ID for nested agents
+            tool_use_id: Tool use ID for PreToolUse/PostToolUse correlation
 
         Returns:
             True if agent was created, False if already existed
@@ -529,13 +549,146 @@ class Database:
         created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         cursor = self.conn.execute(
             """
-            INSERT OR IGNORE INTO agents (id, type, name, session_id, parent_agent_id, status, created_at)
-            VALUES (?, ?, ?, ?, ?, 'running', ?)
+            INSERT OR IGNORE INTO agents (id, tool_use_id, type, name, session_id, parent_agent_id, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'running', ?)
             """,
-            (agent_id, agent_type, name, session_id, parent_agent_id, created_at),
+            (agent_id, tool_use_id, agent_type, name, session_id, parent_agent_id, created_at),
         )
         self.conn.commit()
         return cursor.rowcount > 0
+
+    def create_pending_agent(
+        self,
+        tool_use_id: str,
+        session_id: str,
+        agent_type: str = "subagent",
+        name: str | None = None,
+        parent_agent_id: str | None = None,
+    ) -> bool:
+        """Create pending agent record keyed by tool_use_id (before agent_id is known).
+
+        Called from PreToolUse when Task tool is invoked. The agent_id is not yet
+        available, so we use tool_use_id as the primary key temporarily.
+
+        Args:
+            tool_use_id: Correlation ID from PreToolUse (becomes temporary primary key)
+            session_id: Parent session ID
+            agent_type: Agent type (e.g., 'Explore', 'code-reviewer')
+            name: Human-readable agent name (usually description)
+            parent_agent_id: Parent agent ID for nested agents
+
+        Returns:
+            True if agent was created, False if already existed
+        """
+        created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        cursor = self.conn.execute(
+            """
+            INSERT OR IGNORE INTO agents (id, tool_use_id, type, name, session_id, parent_agent_id, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)
+            """,
+            (tool_use_id, tool_use_id, agent_type, name, session_id, parent_agent_id, created_at),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def complete_agent_by_tool_use_id(
+        self,
+        tool_use_id: str,
+        agent_id: str,
+        status: str = "completed",
+    ) -> bool:
+        """Complete pending agent by correlating tool_use_id to set real agent_id.
+
+        Called from PostToolUse when Task tool completes. Updates the pending agent
+        record with the real agent_id and completion status.
+
+        Args:
+            tool_use_id: Correlation ID from PreToolUse/PostToolUse
+            agent_id: Real agent ID from toolUseResult
+            status: Final status ('completed' or 'failed')
+
+        Returns:
+            True if agent was updated, False if not found
+        """
+        completed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+        # Count events for this agent (using tool_use_id since that's what events have)
+        count_cursor = self.conn.execute(
+            "SELECT COUNT(*) FROM events WHERE tool_use_id = ?",
+            (tool_use_id,),
+        )
+        event_count = count_cursor.fetchone()[0]
+
+        # Update agent: change id from tool_use_id to agent_id, set completion status
+        cursor = self.conn.execute(
+            """
+            UPDATE agents
+            SET id = ?, completed_at = ?, status = ?, event_count = ?
+            WHERE tool_use_id = ?
+            """,
+            (agent_id, completed_at, status, event_count, tool_use_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def activate_pending_agent(self, tool_use_id: str, agent_id: str) -> bool:
+        """Activate pending agent by setting real agent_id while keeping status pending.
+
+        Called from SubagentActivated when first tool inside subagent fires.
+        Updates the agent's id from tool_use_id to the real agent_id.
+        The agent remains in 'pending' status until PostToolUse completes it.
+
+        Args:
+            tool_use_id: Correlation ID from PreToolUse (current agent id)
+            agent_id: Real agent ID discovered from agent file
+
+        Returns:
+            True if agent was updated, False if not found
+        """
+        cursor = self.conn.execute(
+            """
+            UPDATE agents
+            SET id = ?
+            WHERE tool_use_id = ? AND status = 'pending'
+            """,
+            (agent_id, tool_use_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def get_agent_by_tool_use_id(self, tool_use_id: str) -> dict[str, Any] | None:
+        """Get agent by tool_use_id (for pending agents before real agent_id is set).
+
+        Args:
+            tool_use_id: Tool use ID from PreToolUse
+
+        Returns:
+            Agent dict or None if not found
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT id, tool_use_id, type, name, session_id, parent_agent_id, status,
+                   created_at, completed_at, event_count
+            FROM agents
+            WHERE tool_use_id = ?
+            """,
+            (tool_use_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "id": row[0],
+            "tool_use_id": row[1],
+            "type": row[2],
+            "name": row[3],
+            "session_id": row[4],
+            "parent_agent_id": row[5],
+            "status": row[6],
+            "created_at": row[7],
+            "completed_at": row[8],
+            "event_count": row[9],
+        }
 
     def update_agent_completed(self, agent_id: str, status: str = "completed") -> bool:
         """Update agent status to completed and calculate event_count.
