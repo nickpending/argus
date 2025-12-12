@@ -1,6 +1,7 @@
 <script lang="ts">
   import { X } from 'lucide-svelte';
   import eventsStore, { type Event } from '../stores/events.svelte';
+  import TypeBadge from './TypeBadge.svelte';
 
   // Reactive data from stores
   let selectedEvent: Event | null = $state(null);
@@ -70,7 +71,7 @@
       </div>
       <div class="detail-row">
         <span class="detail-label">Type</span>
-        <span class="detail-value type-badge {selectedEvent.event_type}">{selectedEvent.event_type}</span>
+        <TypeBadge type={selectedEvent.event_type} />
       </div>
       <div class="detail-row">
         <span class="detail-label">Timestamp</span>
@@ -244,37 +245,6 @@
 
   :global(.detail-json .json-null) {
     color: var(--vw-gray);
-  }
-
-  .type-badge {
-    padding: 0.125rem 0.375rem;
-    border-radius: 3px;
-    font-size: var(--text-xs);
-  }
-
-  .type-badge.tool {
-    background: var(--vw-cyan-bg);
-    color: var(--vw-cyan);
-  }
-
-  .type-badge.agent {
-    background: var(--vw-vibrant-purple-bg);
-    color: var(--vw-vibrant-purple);
-  }
-
-  .type-badge.session {
-    background: var(--vw-purple-bg);
-    color: var(--vw-purple);
-  }
-
-  .type-badge.response {
-    background: var(--vw-success-bg);
-    color: var(--vw-success);
-  }
-
-  .type-badge.prompt {
-    background: var(--vw-warning-bg);
-    color: var(--vw-warning);
   }
 
 </style>

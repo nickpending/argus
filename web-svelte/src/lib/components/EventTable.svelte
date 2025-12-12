@@ -1,5 +1,6 @@
 <script lang="ts">
   import eventsStore, { type Event } from '../stores/events.svelte';
+  import TypeBadge from './TypeBadge.svelte';
 
   // Reactive data from store
   let events: Event[] = $state([]);
@@ -70,7 +71,7 @@
             <td class="time-cell">{formatTime(event.timestamp)}</td>
             <td><span class="source-badge">{event.source}</span></td>
             <td>{getProject(event)}</td>
-            <td><span class="type-badge {event.event_type}">{event.event_type}</span></td>
+            <td><TypeBadge type={event.event_type} /></td>
             <td class="message-cell">{truncateMessage(event.message)}</td>
           </tr>
         {/each}
@@ -142,37 +143,6 @@
     border: 1px solid var(--vw-border);
     border-radius: 3px;
     font-size: var(--text-xs);
-  }
-
-  .type-badge {
-    padding: 0.125rem 0.375rem;
-    border-radius: 3px;
-    font-size: var(--text-xs);
-  }
-
-  .type-badge.tool {
-    background: var(--vw-cyan-bg);
-    color: var(--vw-cyan);
-  }
-
-  .type-badge.agent {
-    background: var(--vw-vibrant-purple-bg);
-    color: var(--vw-vibrant-purple);
-  }
-
-  .type-badge.session {
-    background: var(--vw-purple-bg);
-    color: var(--vw-purple);
-  }
-
-  .type-badge.response {
-    background: var(--vw-success-bg);
-    color: var(--vw-success);
-  }
-
-  .type-badge.prompt {
-    background: var(--vw-warning-bg);
-    color: var(--vw-warning);
   }
 
   .message-cell {
