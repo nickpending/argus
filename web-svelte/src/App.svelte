@@ -2,20 +2,36 @@
   import { Activity, Settings, Download } from 'lucide-svelte';
   import { onMount } from 'svelte';
   import websocket, { type ConnectionStatus } from './lib/stores/websocket.svelte';
+  import eventsStore from './lib/stores/events.svelte';
+  import sessionsStore from './lib/stores/sessions.svelte';
 
   let connectionStatus = $state<ConnectionStatus>('disconnected');
+  let eventCount = $state(0);
+  let sessionCount = $state(0);
 
-  // Sync connection status from store
+  // Sync connection status and counts from stores
   $effect(() => {
     const interval = setInterval(() => {
       connectionStatus = websocket.getStatus();
+      eventCount = eventsStore.getEventCount();
+      sessionCount = sessionsStore.getSessions().length;
     }, 100);
     return () => clearInterval(interval);
   });
 
   onMount(() => {
+    // Initialize store handlers
+    const unsubEvents = eventsStore.initializeHandlers();
+    const unsubSessions = sessionsStore.initializeHandlers();
+
+    // Connect to WebSocket
     websocket.connect();
-    return () => websocket.disconnect();
+
+    return () => {
+      unsubEvents();
+      unsubSessions();
+      websocket.disconnect();
+    };
   });
 </script>
 
@@ -45,12 +61,12 @@
 <!-- Metrics Bar -->
 <div class="metrics-bar">
   <div class="metric-card">
-    <span class="metric-label">Active Sessions</span>
-    <span class="metric-value">0</span>
+    <span class="metric-label">Sessions</span>
+    <span class="metric-value">{sessionCount}</span>
   </div>
   <div class="metric-card">
-    <span class="metric-label">Events/min</span>
-    <span class="metric-value">0</span>
+    <span class="metric-label">Events</span>
+    <span class="metric-value">{eventCount}</span>
   </div>
   <div class="metric-card">
     <span class="metric-label">Errors</span>
