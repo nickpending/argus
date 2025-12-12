@@ -4,20 +4,19 @@
   import websocket, { type ConnectionStatus } from './lib/stores/websocket.svelte';
   import eventsStore from './lib/stores/events.svelte';
   import sessionsStore from './lib/stores/sessions.svelte';
+  import metricsStore from './lib/stores/metrics.svelte';
   import SessionTree from './lib/components/SessionTree.svelte';
   import EventTable from './lib/components/EventTable.svelte';
   import DetailPanel from './lib/components/DetailPanel.svelte';
+  import MetricsBar from './lib/components/MetricsBar.svelte';
 
   let connectionStatus = $state<ConnectionStatus>('disconnected');
-  let eventCount = $state(0);
-  let sessionCount = $state(0);
 
-  // Sync connection status and counts from stores
+  // Sync connection status and update metrics from stores
   $effect(() => {
     const interval = setInterval(() => {
       connectionStatus = websocket.getStatus();
-      eventCount = eventsStore.getEventCount();
-      sessionCount = sessionsStore.getSessions().length;
+      metricsStore.updateMetrics();
     }, 100);
     return () => clearInterval(interval);
   });
@@ -62,24 +61,7 @@
 </header>
 
 <!-- Metrics Bar -->
-<div class="metrics-bar">
-  <div class="metric-card">
-    <span class="metric-label">Sessions</span>
-    <span class="metric-value">{sessionCount}</span>
-  </div>
-  <div class="metric-card">
-    <span class="metric-label">Events</span>
-    <span class="metric-value">{eventCount}</span>
-  </div>
-  <div class="metric-card">
-    <span class="metric-label">Errors</span>
-    <span class="metric-value">0</span>
-  </div>
-  <div class="metric-card">
-    <span class="metric-label">Avg Latency</span>
-    <span class="metric-value">&mdash;</span>
-  </div>
-</div>
+<MetricsBar />
 
 <main class="main-container">
   <!-- Left Panel: Sessions -->
@@ -224,45 +206,6 @@
 
   .status-text {
     color: var(--vw-gray);
-  }
-
-  /* Metrics Bar */
-  .metrics-bar {
-    display: flex;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    background: var(--vw-bg-deep);
-    border-bottom: 1px solid var(--vw-border);
-    flex-shrink: 0;
-  }
-
-  .metric-card {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    background: var(--vw-bg-card);
-    border: 1px solid var(--vw-border);
-    border-radius: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    transition: border-color var(--transition-fast);
-  }
-
-  .metric-card:hover {
-    border-color: var(--vw-border-bright);
-  }
-
-  .metric-label {
-    font-size: var(--text-xs);
-    color: var(--vw-gray);
-    text-transform: lowercase;
-    letter-spacing: 0.05em;
-  }
-
-  .metric-value {
-    font-size: var(--text-xl);
-    font-weight: 600;
-    color: var(--vw-white);
   }
 
   /* Main Container */
