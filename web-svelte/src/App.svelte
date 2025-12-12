@@ -1,7 +1,22 @@
 <script lang="ts">
   import { Activity, Settings, Download } from 'lucide-svelte';
+  import { onMount } from 'svelte';
+  import websocket, { type ConnectionStatus } from './lib/stores/websocket.svelte';
 
-  let connectionStatus = $state<'connected' | 'disconnected' | 'connecting'>('disconnected');
+  let connectionStatus = $state<ConnectionStatus>('disconnected');
+
+  // Sync connection status from store
+  $effect(() => {
+    const interval = setInterval(() => {
+      connectionStatus = websocket.getStatus();
+    }, 100);
+    return () => clearInterval(interval);
+  });
+
+  onMount(() => {
+    websocket.connect();
+    return () => websocket.disconnect();
+  });
 </script>
 
 <header class="header">
