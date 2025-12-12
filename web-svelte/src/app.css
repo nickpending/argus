@@ -1,0 +1,128 @@
+/* Argus Dashboard - Svelte 5 */
+/* Voidwire Design System */
+
+:root {
+    /* Primary Palette (The Heroes) */
+    --vw-cyan: #00D9FF;
+    --vw-purple: #E6CCFF;
+    --vw-vibrant-purple: #9F4DFF;
+
+    /* Semantic Palette (Muted - Tokyo noir treatment) */
+    --vw-success: #4a9e6b;
+    --vw-danger: #a65d6d;
+    --vw-warning: #a68a4d;
+
+    /* Neutral Palette */
+    --vw-white: #EEEEEE;
+    --vw-text: #BBBBBB;
+    --vw-gray: #666666;
+    --vw-dark-gray: #333333;
+
+    /* Background Surfaces */
+    --vw-bg-deep: #0a0e14;
+    --vw-bg-card: #0f1419;
+    --vw-bg-elevated: #151b23;
+
+    /* Gradients */
+    --vw-gradient: linear-gradient(90deg, #00D9FF, #9F4DFF, #FF5C5C);
+    --vw-gradient-subtle: linear-gradient(90deg, #00D9FF, #9F4DFF);
+
+    /* Derived Colors */
+    --vw-cyan-dim: #00a8cc;
+    --vw-cyan-subtle: rgba(0, 217, 255, 0.15);
+    --vw-cyan-bg: rgba(0, 217, 255, 0.08);
+    --vw-purple-subtle: rgba(230, 204, 255, 0.15);
+    --vw-border: var(--vw-dark-gray);
+    --vw-border-bright: #38444d;
+    --vw-border-accent: rgba(0, 217, 255, 0.3);
+
+    /* Level Colors */
+    --vw-level-debug: var(--vw-gray);
+    --vw-level-info: var(--vw-success);
+    --vw-level-warn: var(--vw-warning);
+    --vw-level-error: var(--vw-danger);
+
+    /* Typography */
+    --vw-font-body: 'Inter', system-ui, sans-serif;
+    --vw-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+    /* Layout */
+    --header-height: 56px;
+    --panel-left-width: 280px;
+    --panel-right-width: 380px;
+    --panel-gap: 1px;
+
+    /* Transitions */
+    --transition-fast: 150ms ease;
+    --transition-normal: 200ms ease;
+
+    /* Text Sizes */
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.5rem;
+}
+
+/* Base Reset */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 14px;
+}
+
+body {
+    font-family: var(--vw-font-body);
+    background: var(--vw-bg-deep);
+    color: var(--vw-text);
+    line-height: 1.5;
+    overflow: hidden;
+    height: 100vh;
+    /* Terminal Noir: Grid + gradient wash */
+    background-image:
+        linear-gradient(rgba(0, 217, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 217, 255, 0.03) 1px, transparent 1px),
+        radial-gradient(ellipse at top right, rgba(159, 77, 255, 0.08) 0%, transparent 60%);
+    background-size: 24px 24px, 24px 24px, 100% 100%;
+}
+
+#app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--vw-bg-deep);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--vw-dark-gray);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--vw-gray);
+}
+
+/* Focus States */
+:focus-visible {
+    outline: 1px solid var(--vw-cyan);
+    outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+    background: var(--vw-cyan-subtle);
+    color: var(--vw-white);
+}
