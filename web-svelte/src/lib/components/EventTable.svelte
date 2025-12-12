@@ -1,0 +1,184 @@
+<script lang="ts">
+  import eventsStore, { type Event } from '../stores/events.svelte';
+
+  // Reactive data from store
+  let events: Event[] = $state([]);
+  let selectedEventId: number | null = $state(null);
+
+  // Poll store for updates
+  $effect(() => {
+    const interval = setInterval(() => {
+      events = eventsStore.getEvents();
+      selectedEventId = eventsStore.getSelectedEventId();
+    }, 100);
+    return () => clearInterval(interval);
+  });
+
+  function formatTime(timestamp: string): string {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch {
+      return '—';
+    }
+  }
+
+  function truncateMessage(message: string | undefined, maxLength: number = 80): string {
+    if (!message) return '—';
+    if (message.length <= maxLength) return message;
+    return message.slice(0, maxLength) + '...';
+  }
+
+  function getProject(event: Event): string {
+    return (event.data?.project as string) || '—';
+  }
+
+  function handleRowClick(event: Event): void {
+    eventsStore.selectEvent(event.id);
+  }
+
+</script>
+
+<div class="events-panel">
+  <table class="events-table">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Source</th>
+        <th>Project</th>
+        <th>Type</th>
+        <th>Message</th>
+      </tr>
+    </thead>
+    <tbody>
+      {#if events.length === 0}
+        <tr class="placeholder-row">
+          <td colspan="5">Events will appear here</td>
+        </tr>
+      {:else}
+        {#each events as event (event.id)}
+          <tr
+            class="event-row"
+            class:selected={selectedEventId === event.id}
+            onclick={() => handleRowClick(event)}
+          >
+            <td class="time-cell">{formatTime(event.timestamp)}</td>
+            <td><span class="source-badge">{event.source}</span></td>
+            <td>{getProject(event)}</td>
+            <td><span class="type-badge {event.event_type}">{event.event_type}</span></td>
+            <td class="message-cell">{truncateMessage(event.message)}</td>
+          </tr>
+        {/each}
+      {/if}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .events-panel {
+    flex: 1;
+    overflow: auto;
+  }
+
+  .events-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+
+  .events-table th {
+    position: sticky;
+    top: 0;
+    background: var(--vw-bg-elevated);
+    padding: 0.75rem 1rem;
+    text-align: left;
+    font-weight: 500;
+    color: var(--vw-gray);
+    text-transform: lowercase;
+    font-size: var(--text-xs);
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--vw-border);
+  }
+
+  .events-table td {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--vw-border);
+    color: var(--vw-text);
+  }
+
+  .event-row {
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .event-row:hover {
+    background: var(--vw-bg-elevated);
+  }
+
+  .event-row.selected {
+    background: var(--vw-cyan-bg);
+  }
+
+  .placeholder-row td {
+    text-align: center;
+    color: var(--vw-gray);
+    padding: 2rem;
+  }
+
+  .time-cell {
+    font-family: var(--font-mono);
+    color: var(--vw-gray);
+    white-space: nowrap;
+  }
+
+  .source-badge {
+    padding: 0.125rem 0.375rem;
+    background: var(--vw-bg-elevated);
+    border: 1px solid var(--vw-border);
+    border-radius: 3px;
+    font-size: var(--text-xs);
+  }
+
+  .type-badge {
+    padding: 0.125rem 0.375rem;
+    border-radius: 3px;
+    font-size: var(--text-xs);
+  }
+
+  .type-badge.tool {
+    background: var(--vw-cyan-bg);
+    color: var(--vw-cyan);
+  }
+
+  .type-badge.agent {
+    background: var(--vw-vibrant-purple-bg);
+    color: var(--vw-vibrant-purple);
+  }
+
+  .type-badge.session {
+    background: var(--vw-purple-bg);
+    color: var(--vw-purple);
+  }
+
+  .type-badge.response {
+    background: var(--vw-success-bg);
+    color: var(--vw-success);
+  }
+
+  .type-badge.prompt {
+    background: var(--vw-warning-bg);
+    color: var(--vw-warning);
+  }
+
+  .message-cell {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>

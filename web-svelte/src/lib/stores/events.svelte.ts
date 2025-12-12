@@ -13,7 +13,6 @@ export interface Event {
   event_type: "tool" | "session" | "agent" | "response" | "prompt";
   timestamp: string;
   message?: string;
-  level?: "debug" | "info" | "warn" | "error";
   session_id?: string;
   agent_id?: string;
   data?: Record<string, unknown>;
@@ -29,6 +28,7 @@ export interface Event {
 let events: Event[] = $state([]);
 let knownEventIds: Set<number> = new Set();
 let eventCount: number = $state(0);
+let selectedEventId: number | null = $state(null);
 
 // Add event with deduplication
 function addEvent(event: Event): boolean {
@@ -71,6 +71,20 @@ function getEventCount(): number {
   return eventCount;
 }
 
+// Selection management
+function selectEvent(id: number | null): void {
+  selectedEventId = id;
+}
+
+function getSelectedEventId(): number | null {
+  return selectedEventId;
+}
+
+function getSelectedEvent(): Event | null {
+  if (selectedEventId === null) return null;
+  return events.find((e) => e.id === selectedEventId) || null;
+}
+
 // Handle incoming event message from WebSocket
 function handleEventMessage(message: ServerMessage): void {
   const event = message.event as Event;
@@ -98,6 +112,9 @@ export const eventsStore = {
   addEvent,
   addEvents,
   clearEvents,
+  selectEvent,
+  getSelectedEventId,
+  getSelectedEvent,
   initializeHandlers,
 };
 

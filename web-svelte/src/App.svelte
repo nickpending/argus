@@ -4,6 +4,9 @@
   import websocket, { type ConnectionStatus } from './lib/stores/websocket.svelte';
   import eventsStore from './lib/stores/events.svelte';
   import sessionsStore from './lib/stores/sessions.svelte';
+  import SessionTree from './lib/components/SessionTree.svelte';
+  import EventTable from './lib/components/EventTable.svelte';
+  import DetailPanel from './lib/components/DetailPanel.svelte';
 
   let connectionStatus = $state<ConnectionStatus>('disconnected');
   let eventCount = $state(0);
@@ -85,7 +88,7 @@
       <h2>Sessions</h2>
     </div>
     <div class="panel-content">
-      <p class="placeholder">Session tree</p>
+      <SessionTree />
     </div>
   </aside>
 
@@ -114,25 +117,7 @@
     </div>
 
     <!-- Events Table -->
-    <div class="events-panel">
-      <table class="events-table">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Source</th>
-            <th>Project</th>
-            <th>Type</th>
-            <th>Level</th>
-            <th>Message</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr class="placeholder-row">
-            <td colspan="6">Events will appear here</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <EventTable />
 
     <!-- Timeline -->
     <div class="timeline-panel">
@@ -145,12 +130,7 @@
 
   <!-- Right Panel: Event Detail -->
   <aside class="panel right-panel">
-    <div class="panel-header">
-      <h2>Event Detail</h2>
-    </div>
-    <div class="panel-content">
-      <p class="placeholder">Select an event to view details</p>
-    </div>
+    <DetailPanel />
   </aside>
 </main>
 
@@ -437,44 +417,6 @@
   .time-btn:hover:not(.active) {
     border-color: var(--vw-border-bright);
     background: var(--vw-bg-card);
-  }
-
-  /* Events Panel */
-  .events-panel {
-    flex: 1;
-    overflow: auto;
-  }
-
-  .events-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--text-sm);
-  }
-
-  .events-table th {
-    position: sticky;
-    top: 0;
-    background: var(--vw-bg-elevated);
-    padding: 0.75rem 1rem;
-    text-align: left;
-    font-weight: 500;
-    color: var(--vw-gray);
-    text-transform: lowercase;
-    font-size: var(--text-xs);
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--vw-border);
-  }
-
-  .events-table td {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--vw-border);
-    color: var(--vw-text);
-  }
-
-  .placeholder-row td {
-    text-align: center;
-    color: var(--vw-gray);
-    padding: 2rem;
   }
 
   /* Timeline Panel */
