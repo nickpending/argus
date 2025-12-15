@@ -1,33 +1,37 @@
 <script lang="ts">
   import { ChevronRight, ChevronDown } from 'lucide-svelte';
   import sessionsStore, { type Session, type Agent } from '../stores/sessions.svelte';
+  import eventsStore from '../stores/events.svelte';
 
   // Track expanded state per node
   let expandedNodes: Set<string> = $state(new Set());
 
+  // Show ended sessions toggle (default: hide ended)
+  let showEnded: boolean = $state(false);
+
   // Reactive data from store
-  let sessions: Session[] = $state([]);
+  let allSessions: Session[] = $state([]);
   let hierarchy: { rootAgents: Agent[]; childrenMap: Record<string, Agent[]> } = $state({ rootAgents: [], childrenMap: {} });
   let selectedSessionId: string | null = $state(null);
   let selectedAgentId: string | null = $state(null);
 
-  // Poll store for updates
+  // Filtered sessions based on showEnded toggle
+  let sessions: Session[] = $derived(
+    showEnded
+      ? allSessions
+      : allSessions.filter(s => s.status === 'active')
+  );
+
+  // Poll store for updates (including hierarchy rebuild)
   $effect(() => {
     const interval = setInterval(() => {
-      sessions = sessionsStore.getSessions();
+      allSessions = sessionsStore.getSessions();
       selectedSessionId = sessionsStore.getSelectedSessionId();
       selectedAgentId = sessionsStore.getSelectedAgentId();
+      // Rebuild hierarchy for all agents so any session can be expanded
+      hierarchy = sessionsStore.buildAgentHierarchy();
     }, 100);
     return () => clearInterval(interval);
-  });
-
-  // Build hierarchy when sessions change
-  $effect(() => {
-    if (selectedSessionId) {
-      hierarchy = sessionsStore.buildAgentHierarchy(selectedSessionId);
-    } else {
-      hierarchy = sessionsStore.buildAgentHierarchy();
-    }
   });
 
   function toggleExpand(id: string): void {
@@ -45,6 +49,8 @@
     toggleExpand(`session-${session.id}`);
     // Select session
     sessionsStore.selectSession(session.id);
+    // Load events for this session (fetches on-demand if not already loaded)
+    eventsStore.loadEventsForSession(session.id);
   }
 
   function handleAgentClick(agent: Agent): void {
@@ -52,6 +58,8 @@
     toggleExpand(`agent-${agent.id}`);
     // Select agent
     sessionsStore.selectAgent(agent.id);
+    // Load events for this agent (fetches on-demand if not already loaded)
+    eventsStore.loadEventsForAgent(agent.id);
   }
 
   function isExpanded(id: string): boolean {
@@ -104,8 +112,20 @@
 {/snippet}
 
 <div class="session-tree">
+  <div class="tree-controls">
+    <label class="show-ended-toggle">
+      <input type="checkbox" bind:checked={showEnded} />
+      <span>show ended</span>
+    </label>
+    {#if selectedSessionId || selectedAgentId}
+      <button class="clear-btn" onclick={() => { sessionsStore.selectSession(null); }}>
+        show all
+      </button>
+    {/if}
+  </div>
+
   {#if sessions.length === 0}
-    <p class="empty-message">No active sessions</p>
+    <p class="empty-message">{showEnded ? 'No sessions' : 'No active sessions'}</p>
   {:else}
     {#each sessions as session (session.id)}
       {@const agents = getAgentsForSession(session.id)}
@@ -150,6 +170,49 @@
 <style>
   .session-tree {
     font-size: var(--text-sm);
+  }
+
+  .tree-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--vw-border);
+  }
+
+  .clear-btn {
+    padding: 0.25rem 0.5rem;
+    margin-right: 0.5rem;
+    background: var(--vw-bg-elevated);
+    border: 1px solid var(--vw-border);
+    border-radius: 3px;
+    color: var(--vw-cyan);
+    font-size: var(--text-xs);
+    cursor: pointer;
+    text-transform: lowercase;
+  }
+
+  .clear-btn:hover {
+    background: var(--vw-cyan-bg);
+    border-color: var(--vw-cyan);
+  }
+
+  .show-ended-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    color: var(--vw-gray);
+    font-size: var(--text-xs);
+    text-transform: lowercase;
+    cursor: pointer;
+  }
+
+  .show-ended-toggle:hover {
+    background: var(--vw-bg-elevated);
+  }
+
+  .show-ended-toggle input[type="checkbox"] {
+    accent-color: var(--vw-cyan);
   }
 
   .empty-message {

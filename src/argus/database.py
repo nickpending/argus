@@ -612,10 +612,10 @@ class Database:
         """
         completed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
-        # Count events for this agent (using tool_use_id since that's what events have)
+        # Count events for this agent (agent_id is set after activation)
         count_cursor = self.conn.execute(
-            "SELECT COUNT(*) FROM events WHERE tool_use_id = ?",
-            (tool_use_id,),
+            "SELECT COUNT(*) FROM events WHERE agent_id = ?",
+            (agent_id,),
         )
         event_count = count_cursor.fetchone()[0]
 

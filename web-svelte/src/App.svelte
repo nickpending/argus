@@ -26,8 +26,11 @@
     const unsubEvents = eventsStore.initializeHandlers();
     const unsubSessions = sessionsStore.initializeHandlers();
 
-    // Connect to WebSocket
-    websocket.connect();
+    // Load initial data from REST API, then connect WebSocket
+    // Sessions must load first so events can update last_event_time for staleness detection
+    sessionsStore.loadInitialData()
+      .then(() => eventsStore.loadInitialEvents())
+      .then(() => websocket.connect());
 
     return () => {
       unsubEvents();

@@ -1,16 +1,47 @@
 <script lang="ts">
   import eventsStore, { type Event } from '../stores/events.svelte';
+  import sessionsStore from '../stores/sessions.svelte';
   import TypeBadge from './TypeBadge.svelte';
 
-  // Reactive data from store
-  let events: Event[] = $state([]);
+  // Reactive data from stores
+  let allEvents: Event[] = $state([]);
   let selectedEventId: number | null = $state(null);
+  let selectedSessionId: string | null = $state(null);
+  let selectedAgentId: string | null = $state(null);
 
-  // Poll store for updates
+  // Filter events by selected session/agent
+  let events: Event[] = $derived.by(() => {
+    if (!selectedSessionId && !selectedAgentId) {
+      return allEvents;
+    }
+    const filtered = allEvents.filter(event => {
+      if (selectedAgentId && event.agent_id !== selectedAgentId) {
+        return false;
+      }
+      if (selectedSessionId && event.session_id !== selectedSessionId) {
+        return false;
+      }
+      return true;
+    });
+    // Debug: log once when filter changes significantly
+    if (selectedSessionId && filtered.length === 0 && allEvents.length > 0) {
+      console.log('[EventTable] Filter returned 0 events', {
+        selectedSessionId,
+        selectedAgentId,
+        allEventsCount: allEvents.length,
+        sampleEventSessionId: allEvents[0]?.session_id
+      });
+    }
+    return filtered;
+  });
+
+  // Poll stores for updates
   $effect(() => {
     const interval = setInterval(() => {
-      events = eventsStore.getEvents();
+      allEvents = eventsStore.getEvents();
       selectedEventId = eventsStore.getSelectedEventId();
+      selectedSessionId = sessionsStore.getSelectedSessionId();
+      selectedAgentId = sessionsStore.getSelectedAgentId();
     }, 100);
     return () => clearInterval(interval);
   });
@@ -46,6 +77,15 @@
 </script>
 
 <div class="events-panel">
+  <div class="events-header">
+    <span class="events-count">
+      {#if selectedSessionId || selectedAgentId}
+        {events.length} of {allEvents.length} events
+      {:else}
+        {events.length} events
+      {/if}
+    </span>
+  </div>
   <table class="events-table">
     <thead>
       <tr>
@@ -84,6 +124,21 @@
   .events-panel {
     flex: 1;
     overflow: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .events-header {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--vw-border);
+    background: var(--vw-bg-elevated);
+    flex-shrink: 0;
+  }
+
+  .events-count {
+    font-size: var(--text-xs);
+    color: var(--vw-gray);
+    text-transform: lowercase;
   }
 
   .events-table {

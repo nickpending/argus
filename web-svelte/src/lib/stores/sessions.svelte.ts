@@ -13,6 +13,7 @@ export interface Session {
   status: "active" | "ended";
   created_at?: string;
   completed_at?: string;
+  last_event_time?: string; // Track last activity for staleness detection
 }
 
 // Agent interface
@@ -157,12 +158,126 @@ function getSelectedAgentId(): string | null {
   return selectedAgentId;
 }
 
+// Update last event time for a session (called when events loaded)
+function updateSessionLastEventTime(
+  sessionId: string,
+  timestamp: string,
+): void {
+  const existing = sessions.get(sessionId);
+  if (existing) {
+    const current = existing.last_event_time;
+    // Only update if newer
+    if (!current || timestamp > current) {
+      sessions = new Map(sessions).set(sessionId, {
+        ...existing,
+        last_event_time: timestamp,
+      });
+    }
+  }
+}
+
+// Check if session is stale (active but no recent events)
+const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+function isSessionStale(session: Session): boolean {
+  if (session.status !== "active") return false;
+  if (!session.last_event_time) return true; // No events = stale
+
+  const lastEvent = new Date(session.last_event_time).getTime();
+  const now = Date.now();
+  return now - lastEvent > STALE_THRESHOLD_MS;
+}
+
 // Clear all (for refresh)
 function clearAll(): void {
   sessions = new Map();
   agents = new Map();
   selectedSessionId = null;
   selectedAgentId = null;
+}
+
+// API response types (differ slightly from store interfaces)
+interface SessionResponse {
+  id: string;
+  project?: string;
+  started_at: string;
+  ended_at?: string;
+  status: "active" | "ended";
+  agent_count?: number;
+}
+
+interface AgentResponse {
+  id: string;
+  session_id: string;
+  parent_agent_id?: string;
+  name?: string;
+  type?: string;
+  status: "running" | "completed" | "failed";
+  event_count: number;
+  created_at: string;
+  completed_at?: string;
+}
+
+// Load initial data from REST API
+async function loadInitialData(): Promise<void> {
+  console.log("[sessions] Loading initial data from REST API...");
+
+  try {
+    // Fetch sessions and agents in parallel
+    const [sessionsRes, agentsRes] = await Promise.all([
+      fetch("/sessions"),
+      fetch("/agents"),
+    ]);
+
+    if (!sessionsRes.ok) {
+      console.warn(
+        `[sessions] Failed to fetch sessions: ${sessionsRes.status}`,
+      );
+      return;
+    }
+    if (!agentsRes.ok) {
+      console.warn(`[sessions] Failed to fetch agents: ${agentsRes.status}`);
+      return;
+    }
+
+    const sessionsData = await sessionsRes.json();
+    const agentsData = await agentsRes.json();
+
+    // Map and add sessions (API uses started_at/ended_at, store uses created_at/completed_at)
+    const sessionList: SessionResponse[] = sessionsData.sessions || [];
+    for (const s of sessionList) {
+      addSession({
+        id: s.id,
+        project: s.project,
+        status: s.status,
+        created_at: s.started_at,
+        completed_at: s.ended_at,
+      });
+    }
+
+    // Add agents (fields match directly)
+    const agentList: AgentResponse[] = agentsData.agents || [];
+    for (const a of agentList) {
+      addAgent({
+        id: a.id,
+        session_id: a.session_id,
+        parent_agent_id: a.parent_agent_id,
+        name: a.name,
+        type: a.type,
+        status: a.status,
+        event_count: a.event_count || 0,
+        created_at: a.created_at,
+        completed_at: a.completed_at,
+      });
+    }
+
+    console.log(
+      `[sessions] Loaded ${sessionList.length} sessions, ${agentList.length} agents`,
+    );
+  } catch (err) {
+    console.error("[sessions] Error loading initial data:", err);
+    // Graceful degradation - WebSocket will still work
+  }
 }
 
 // WebSocket message handlers
@@ -252,6 +367,9 @@ export const sessionsStore = {
   getSelectedAgentId,
   clearAll,
   initializeHandlers,
+  loadInitialData,
+  updateSessionLastEventTime,
+  isSessionStale,
 };
 
 export default sessionsStore;

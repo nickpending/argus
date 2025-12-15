@@ -5,6 +5,7 @@
  */
 
 import websocket, { type ServerMessage } from "./websocket.svelte";
+import sessionsStore from "./sessions.svelte";
 
 // Event type matching backend schema
 export interface Event {
@@ -44,13 +45,16 @@ function addEvent(event: Event): boolean {
 
 // Add multiple events (for historical fetch)
 function addEvents(newEvents: Event[]): void {
-  for (const event of newEvents) {
-    if (!knownEventIds.has(event.id)) {
-      knownEventIds.add(event.id);
-    }
+  // Filter to only new events BEFORE adding to known set
+  const uniqueEvents = newEvents.filter((e) => !knownEventIds.has(e.id));
+
+  // Now add to known set
+  for (const event of uniqueEvents) {
+    knownEventIds.add(event.id);
   }
-  // For historical, append in order (already sorted by API)
-  events = [...newEvents.filter((e) => !knownEventIds.has(e.id)), ...events];
+
+  // Append new events (API returns newest first, so prepend)
+  events = [...uniqueEvents, ...events];
   eventCount = events.length;
 }
 
@@ -94,7 +98,139 @@ function handleEventMessage(message: ServerMessage): void {
       console.log(
         `[events] Added event ${event.id}: ${event.event_type} - ${event.message?.slice(0, 50)}`,
       );
+      // Update session last event time for staleness tracking
+      if (event.session_id) {
+        sessionsStore.updateSessionLastEventTime(
+          event.session_id,
+          event.timestamp,
+        );
+      }
     }
+  }
+}
+
+// Load events for a specific session (on-demand when session selected)
+async function loadEventsForSession(sessionId: string): Promise<void> {
+  console.log(
+    `[events] Loading events for session ${sessionId.slice(0, 8)}...`,
+  );
+
+  try {
+    const response = await fetch(`/events?session_id=${sessionId}`);
+
+    if (!response.ok) {
+      console.warn(
+        `[events] Failed to fetch session events: ${response.status}`,
+      );
+      return;
+    }
+
+    const data = await response.json();
+    const eventList: Event[] = data.events || [];
+
+    // Add events with deduplication
+    const reversed = [...eventList].reverse();
+    for (const event of reversed) {
+      if (!knownEventIds.has(event.id)) {
+        knownEventIds.add(event.id);
+        events = [event, ...events];
+      }
+    }
+    eventCount = events.length;
+
+    // Update session's last event time from newest event
+    if (eventList.length > 0) {
+      const newest = eventList[0]; // API returns newest first
+      sessionsStore.updateSessionLastEventTime(sessionId, newest.timestamp);
+    }
+
+    console.log(
+      `[events] Loaded ${eventList.length} events for session ${sessionId.slice(0, 8)}`,
+    );
+  } catch (err) {
+    console.error("[events] Error loading session events:", err);
+  }
+}
+
+// Load events for a specific agent (on-demand when agent selected)
+async function loadEventsForAgent(agentId: string): Promise<void> {
+  console.log(`[events] Loading events for agent ${agentId.slice(0, 7)}...`);
+
+  try {
+    const response = await fetch(`/events?agent_id=${agentId}&limit=500`);
+
+    if (!response.ok) {
+      console.warn(`[events] Failed to fetch agent events: ${response.status}`);
+      return;
+    }
+
+    const data = await response.json();
+    const eventList: Event[] = data.events || [];
+
+    // Add events with deduplication
+    const reversed = [...eventList].reverse();
+    for (const event of reversed) {
+      if (!knownEventIds.has(event.id)) {
+        knownEventIds.add(event.id);
+        events = [event, ...events];
+      }
+    }
+    eventCount = events.length;
+
+    console.log(
+      `[events] Loaded ${eventList.length} events for agent ${agentId.slice(0, 7)}`,
+    );
+  } catch (err) {
+    console.error("[events] Error loading agent events:", err);
+  }
+}
+
+// Load initial events from REST API (last hour by default)
+async function loadInitialEvents(): Promise<void> {
+  console.log("[events] Loading initial events from REST API...");
+
+  try {
+    // Fetch recent events (last hour)
+    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const response = await fetch(`/events?since=${since}&limit=500`);
+
+    if (!response.ok) {
+      console.warn(`[events] Failed to fetch events: ${response.status}`);
+      return;
+    }
+
+    const data = await response.json();
+    const eventList: Event[] = data.events || [];
+
+    // Add events (oldest first so newest ends up at top)
+    // Track latest event per session for staleness detection
+    const latestBySession: Record<string, string> = {};
+    const reversed = [...eventList].reverse();
+    for (const event of reversed) {
+      if (!knownEventIds.has(event.id)) {
+        knownEventIds.add(event.id);
+        events = [event, ...events];
+      }
+      // Track newest event per session
+      if (event.session_id) {
+        if (
+          !latestBySession[event.session_id] ||
+          event.timestamp > latestBySession[event.session_id]
+        ) {
+          latestBySession[event.session_id] = event.timestamp;
+        }
+      }
+    }
+    eventCount = events.length;
+
+    // Update session last event times
+    for (const [sessionId, timestamp] of Object.entries(latestBySession)) {
+      sessionsStore.updateSessionLastEventTime(sessionId, timestamp);
+    }
+
+    console.log(`[events] Loaded ${eventList.length} events from last hour`);
+  } catch (err) {
+    console.error("[events] Error loading initial events:", err);
   }
 }
 
@@ -116,6 +252,9 @@ export const eventsStore = {
   getSelectedEventId,
   getSelectedEvent,
   initializeHandlers,
+  loadInitialEvents,
+  loadEventsForSession,
+  loadEventsForAgent,
 };
 
 export default eventsStore;
