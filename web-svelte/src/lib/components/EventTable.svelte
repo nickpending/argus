@@ -1,47 +1,21 @@
 <script lang="ts">
   import eventsStore, { type Event } from '../stores/events.svelte';
-  import sessionsStore from '../stores/sessions.svelte';
+  import filtersStore from '../stores/filters.svelte';
   import TypeBadge from './TypeBadge.svelte';
 
   // Reactive data from stores
   let allEvents: Event[] = $state([]);
+  let events: Event[] = $state([]);
   let selectedEventId: number | null = $state(null);
-  let selectedSessionId: string | null = $state(null);
-  let selectedAgentId: string | null = $state(null);
+  let hasActiveFilters: boolean = $state(false);
 
-  // Filter events by selected session/agent
-  let events: Event[] = $derived.by(() => {
-    if (!selectedSessionId && !selectedAgentId) {
-      return allEvents;
-    }
-    const filtered = allEvents.filter(event => {
-      if (selectedAgentId && event.agent_id !== selectedAgentId) {
-        return false;
-      }
-      if (selectedSessionId && event.session_id !== selectedSessionId) {
-        return false;
-      }
-      return true;
-    });
-    // Debug: log once when filter changes significantly
-    if (selectedSessionId && filtered.length === 0 && allEvents.length > 0) {
-      console.log('[EventTable] Filter returned 0 events', {
-        selectedSessionId,
-        selectedAgentId,
-        allEventsCount: allEvents.length,
-        sampleEventSessionId: allEvents[0]?.session_id
-      });
-    }
-    return filtered;
-  });
-
-  // Poll stores for updates
+  // Poll stores for updates - filters store handles all filtering
   $effect(() => {
     const interval = setInterval(() => {
       allEvents = eventsStore.getEvents();
+      events = filtersStore.getFilteredEvents();
       selectedEventId = eventsStore.getSelectedEventId();
-      selectedSessionId = sessionsStore.getSelectedSessionId();
-      selectedAgentId = sessionsStore.getSelectedAgentId();
+      hasActiveFilters = filtersStore.hasActiveFilters();
     }, 100);
     return () => clearInterval(interval);
   });
@@ -79,7 +53,7 @@
 <div class="events-panel">
   <div class="events-header">
     <span class="events-count">
-      {#if selectedSessionId || selectedAgentId}
+      {#if hasActiveFilters}
         {events.length} of {allEvents.length} events
       {:else}
         {events.length} events

@@ -9,6 +9,7 @@
   import EventTable from './lib/components/EventTable.svelte';
   import DetailPanel from './lib/components/DetailPanel.svelte';
   import MetricsBar from './lib/components/MetricsBar.svelte';
+  import FilterBar from './lib/components/FilterBar.svelte';
 
   let connectionStatus = $state<ConnectionStatus>('disconnected');
 
@@ -80,26 +81,7 @@
   <!-- Center Panel: Filters + Events + Timeline -->
   <section class="center-area">
     <!-- Filter Bar -->
-    <div class="filter-bar">
-      <select class="filter-select">
-        <option>Source: All</option>
-      </select>
-      <select class="filter-select">
-        <option>Project: All</option>
-      </select>
-      <select class="filter-select">
-        <option>Type: All</option>
-      </select>
-      <select class="filter-select">
-        <option>Level: All</option>
-      </select>
-      <input type="text" class="filter-search" placeholder="Search events..." />
-      <div class="time-range-btns">
-        <button class="time-btn active">1h</button>
-        <button class="time-btn">24h</button>
-        <button class="time-btn">7d</button>
-      </div>
-    </div>
+    <FilterBar />
 
     <!-- Events Table -->
     <EventTable />
@@ -268,100 +250,6 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: var(--vw-bg-card);
-  }
-
-  /* Filter Bar */
-  .filter-bar {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--vw-border);
-    flex-shrink: 0;
-  }
-
-  .filter-select {
-    padding: 0.5rem 0.75rem;
-    background: var(--vw-bg-elevated);
-    border: 1px solid var(--vw-border);
-    border-radius: 4px;
-    color: var(--vw-text);
-    font-size: var(--text-sm);
-    text-transform: lowercase;
-    cursor: pointer;
-    transition: border-color var(--transition-fast);
-  }
-
-  .filter-select:hover {
-    border-color: var(--vw-border-bright);
-  }
-
-  .filter-select:focus {
-    border-color: var(--vw-cyan);
-    outline: none;
-  }
-
-  .filter-search {
-    flex: 1;
-    padding: 0.5rem 0.75rem;
-    background: var(--vw-bg-elevated);
-    border: 1px solid var(--vw-border);
-    border-radius: 4px;
-    color: var(--vw-text);
-    font-size: var(--text-sm);
-    transition: border-color var(--transition-fast);
-  }
-
-  .filter-search:hover {
-    border-color: var(--vw-border-bright);
-  }
-
-  .filter-search:focus {
-    border-color: var(--vw-cyan);
-    outline: none;
-  }
-
-  .filter-search::placeholder {
-    color: var(--vw-gray);
-    text-transform: lowercase;
-  }
-
-  .time-range-btns {
-    display: flex;
-    gap: 0;
-  }
-
-  .time-btn {
-    padding: 0.5rem 0.75rem;
-    background: var(--vw-bg-elevated);
-    border: 1px solid var(--vw-border);
-    color: var(--vw-gray);
-    font-size: var(--text-sm);
-    text-transform: lowercase;
-    cursor: pointer;
-    margin-left: -1px;
-    transition: border-color var(--transition-fast), background var(--transition-fast);
-  }
-
-  .time-btn:first-child {
-    margin-left: 0;
-    border-radius: 4px 0 0 4px;
-  }
-
-  .time-btn:last-child {
-    border-radius: 0 4px 4px 0;
-  }
-
-  .time-btn.active {
-    background: var(--vw-cyan-bg);
-    border-color: var(--vw-cyan);
-    color: var(--vw-cyan);
-    z-index: 1;
-  }
-
-  .time-btn:hover:not(.active) {
-    border-color: var(--vw-border-bright);
     background: var(--vw-bg-card);
   }
 
