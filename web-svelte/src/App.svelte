@@ -10,6 +10,7 @@
   import DetailPanel from './lib/components/DetailPanel.svelte';
   import MetricsBar from './lib/components/MetricsBar.svelte';
   import FilterBar from './lib/components/FilterBar.svelte';
+  import CombinedTimeline from './lib/components/CombinedTimeline.svelte';
 
   let connectionStatus = $state<ConnectionStatus>('disconnected');
 
@@ -86,12 +87,9 @@
     <!-- Events Table -->
     <EventTable />
 
-    <!-- Timeline -->
-    <div class="timeline-panel">
-      <div class="timeline-header">Event Density Timeline</div>
-      <div class="timeline-canvas">
-        <p class="placeholder">Canvas timeline</p>
-      </div>
+    <!-- Timeline Section: Combined Swimlanes + Density -->
+    <div class="timeline-section">
+      <CombinedTimeline />
     </div>
   </section>
 
@@ -253,28 +251,10 @@
     background: var(--vw-bg-card);
   }
 
-  /* Timeline Panel */
-  .timeline-panel {
-    height: 120px;
+  /* Timeline Section (Combined Swimlanes + Density) */
+  .timeline-section {
+    height: 300px;
     border-top: 1px solid var(--vw-border);
     flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .timeline-header {
-    padding: 0.5rem 1rem;
-    font-size: var(--text-xs);
-    color: var(--vw-gray);
-    text-transform: lowercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--vw-border);
-  }
-
-  .timeline-canvas {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 </style>

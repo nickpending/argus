@@ -140,6 +140,11 @@ function getAgentsForSession(sessionId: string): Agent[] {
   return Array.from(agents.values()).filter((a) => a.session_id === sessionId);
 }
 
+// Get all agents (for swimlanes view)
+function getAgents(): Agent[] {
+  return Array.from(agents.values());
+}
+
 // Selection management
 function selectSession(id: string | null): void {
   selectedSessionId = id;
@@ -354,6 +359,7 @@ function initializeHandlers(): () => void {
 // Export store interface
 export const sessionsStore = {
   getSessions,
+  getAgents,
   getAgentsForSession,
   buildAgentHierarchy,
   addSession,
