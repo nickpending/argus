@@ -31,8 +31,8 @@
   const SWIMLANE_RATIO = 0.6;
   const DENSITY_RATIO = 0.4;
 
-  // Padding
-  const PADDING = { top: 10, right: 20, bottom: 30, left: 120 };
+  // Padding - balanced left/right for visual alignment, top space for labels
+  const PADDING = { top: 24, right: 60, bottom: 30, left: 100 };
 
   // Agent type fill patterns/colors
   const AGENT_STYLES: Record<string, { color: string; pattern: 'solid' | 'diagonal' | 'crosshatch' | 'dots' }> = {
@@ -622,9 +622,10 @@
   ></canvas>
 
   {#if agentTooltip && mouseX !== null && mouseY !== null}
+    {@const bar = agentBars.find(b => b.agent.id === hoveredAgent?.id)}
     <div
       class="tooltip agent-tooltip"
-      style="left: {mouseX}px; top: {mouseY - 80}px;"
+      style="left: {bar ? bar.x + bar.width / 2 : mouseX}px; top: {bar ? bar.y + bar.height + 8 : mouseY + 20}px;"
     >
       <div class="tooltip-header">{agentTooltip.type}</div>
       <div class="tooltip-row">
@@ -650,7 +651,7 @@
   {:else if densityTooltip && mouseX !== null && mouseY !== null}
     <div
       class="tooltip"
-      style="left: {mouseX}px; top: {mouseY - 50}px;"
+      style="left: {mouseX}px; top: {mouseY + 20}px;"
     >
       <div class="tooltip-time">{densityTooltip.time}</div>
       <div class="tooltip-counts">{densityTooltip.counts}</div>
