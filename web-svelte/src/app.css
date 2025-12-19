@@ -36,6 +36,7 @@
     --vw-vibrant-purple-bg: rgba(159, 77, 255, 0.08);
     --vw-success-bg: rgba(74, 158, 107, 0.08);
     --vw-warning-bg: rgba(166, 138, 77, 0.08);
+    --vw-danger-bg: rgba(166, 93, 109, 0.08);
     --vw-border: var(--vw-dark-gray);
     --vw-border-bright: #38444d;
     --vw-border-accent: rgba(0, 217, 255, 0.3);

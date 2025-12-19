@@ -2,6 +2,7 @@
   import eventsStore, { type Event } from '../stores/events.svelte';
   import filtersStore from '../stores/filters.svelte';
   import TypeBadge from './TypeBadge.svelte';
+  import StatusBadge from './StatusBadge.svelte';
 
   // Reactive data from stores
   let allEvents: Event[] = $state([]);
@@ -48,6 +49,29 @@
     eventsStore.selectEvent(event.id);
   }
 
+  // Derive status from hook and status fields (tool events only)
+  function getToolStatus(event: Event): { status: string; isBackground: boolean } | null {
+    if (event.event_type !== 'tool') return null;
+
+    const isBackground = event.is_background === true;
+
+    // PreToolUse = started (about to execute)
+    if (event.hook === 'PreToolUse') {
+      return { status: 'started', isBackground };
+    }
+
+    // PostToolUse = completed or failed based on status
+    if (event.hook === 'PostToolUse') {
+      const status = event.status?.toLowerCase();
+      if (status === 'error' || status === 'failed' || status === 'failure') {
+        return { status: 'failed', isBackground };
+      }
+      return { status: 'completed', isBackground };
+    }
+
+    return null;
+  }
+
 </script>
 
 <div class="events-panel">
@@ -67,13 +91,14 @@
         <th>Source</th>
         <th>Project</th>
         <th>Type</th>
+        <th>Status</th>
         <th>Message</th>
       </tr>
     </thead>
     <tbody>
       {#if events.length === 0}
         <tr class="placeholder-row">
-          <td colspan="5">Events will appear here</td>
+          <td colspan="6">Events will appear here</td>
         </tr>
       {:else}
         {#each events as event (event.id)}
@@ -86,6 +111,14 @@
             <td><span class="source-badge">{event.source}</span></td>
             <td>{getProject(event)}</td>
             <td><TypeBadge type={event.event_type} /></td>
+            <td class="status-cell">
+              {#if getToolStatus(event)}
+                {@const toolStatus = getToolStatus(event)!}
+                <StatusBadge status={toolStatus.status} showBackground={toolStatus.isBackground} />
+              {:else}
+                <span class="no-status">—</span>
+              {/if}
+            </td>
             <td class="message-cell">{truncateMessage(event.message)}</td>
           </tr>
         {/each}
@@ -179,5 +212,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .status-cell {
+    white-space: nowrap;
+  }
+
+  .no-status {
+    color: var(--vw-gray);
   }
 </style>
