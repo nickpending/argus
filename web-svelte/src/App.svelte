@@ -42,33 +42,35 @@
   });
 </script>
 
-<header class="header">
-  <div class="header-left">
-    <h1 class="logo">
-      <Activity size={24} strokeWidth={2} />
-      ARGUS
-    </h1>
-    <div class="status-indicator">
-      <span class="status-dot {connectionStatus}"></span>
-      <span class="status-text">{connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}</span>
+<div class="app-grid">
+  <header class="header">
+    <div class="header-left">
+      <h1 class="logo">
+        <Activity size={24} strokeWidth={2} />
+        ARGUS
+      </h1>
+      <div class="status-indicator">
+        <span class="status-dot {connectionStatus}"></span>
+        <span class="status-text">{connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}</span>
+      </div>
     </div>
-  </div>
-  <div class="header-controls">
-    <button class="header-btn">
-      <Settings size={18} />
-      settings
-    </button>
-    <button class="header-btn">
-      <Download size={18} />
-      export
-    </button>
-  </div>
-</header>
+    <div class="header-controls">
+      <button class="header-btn">
+        <Settings size={18} />
+        settings
+      </button>
+      <button class="header-btn">
+        <Download size={18} />
+        export
+      </button>
+    </div>
+  </header>
 
-<!-- Metrics Bar -->
-<MetricsBar />
+  <!-- Metrics Bar -->
+  <div class="metrics-area">
+    <MetricsBar />
+  </div>
 
-<main class="main-container">
   <!-- Left Panel: Sessions -->
   <aside class="panel left-panel">
     <div class="panel-header">
@@ -97,19 +99,31 @@
   <aside class="panel right-panel">
     <DetailPanel />
   </aside>
-</main>
+</div>
 
 <style>
+  /* App Grid Layout */
+  .app-grid {
+    height: 100vh;
+    display: grid;
+    grid-template-areas:
+      "header header header"
+      "metrics metrics metrics"
+      "left center right";
+    grid-template-columns: minmax(240px, 280px) 1fr minmax(320px, 380px);
+    grid-template-rows: var(--header-height) auto 1fr;
+    overflow: hidden;
+  }
+
   /* Header */
   .header {
-    height: var(--header-height);
+    grid-area: header;
     background: var(--vw-bg-card);
     border-bottom: 1px solid var(--vw-border-bright);
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 1.25rem;
-    flex-shrink: 0;
   }
 
   .header-left {
@@ -191,13 +205,10 @@
     color: var(--vw-gray);
   }
 
-  /* Main Container */
-  .main-container {
-    flex: 1;
-    display: grid;
-    grid-template-columns: var(--panel-left-width) 1fr var(--panel-right-width);
-    gap: var(--panel-gap);
-    overflow: hidden;
+  /* Metrics Area */
+  .metrics-area {
+    grid-area: metrics;
+    border-bottom: 1px solid var(--vw-border);
   }
 
   /* Panels */
@@ -236,15 +247,18 @@
   }
 
   .left-panel {
+    grid-area: left;
     border-right: 1px solid var(--vw-border);
   }
 
   .right-panel {
+    grid-area: right;
     border-left: 1px solid var(--vw-border);
   }
 
   /* Center Area */
   .center-area {
+    grid-area: center;
     display: flex;
     flex-direction: column;
     overflow: hidden;

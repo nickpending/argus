@@ -43,16 +43,62 @@
     'default': { color: '#666666', pattern: 'solid' },
   };
 
-  // Event type colors for density chart
+  // Event type colors for density chart (solid colors for gradient creation)
   const TYPE_COLORS = {
-    tool: 'rgba(0, 217, 255, 0.5)',
-    agent: 'rgba(159, 77, 255, 0.5)',
-    session: 'rgba(230, 204, 255, 0.5)',
-    response: 'rgba(74, 158, 107, 0.5)',
-    prompt: 'rgba(166, 138, 77, 0.5)',
+    tool: '#00D9FF',
+    agent: '#9F4DFF',
+    session: '#E6CCFF',
+    response: '#4a9e6b',
+    prompt: '#a68a4d',
   };
 
   const STACK_ORDER: (keyof typeof TYPE_COLORS)[] = ['tool', 'agent', 'session', 'response', 'prompt'];
+
+  // Build smooth bezier path using Catmull-Rom spline
+  function buildSmoothPath(
+    ctx: CanvasRenderingContext2D,
+    points: { x: number; y: number }[],
+    tension: number = 0.3
+  ): void {
+    if (points.length < 2) return;
+
+    ctx.moveTo(points[0].x, points[0].y);
+
+    if (points.length === 2) {
+      ctx.lineTo(points[1].x, points[1].y);
+      return;
+    }
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[Math.max(0, i - 1)];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[Math.min(points.length - 1, i + 2)];
+
+      const cp1x = p1.x + ((p2.x - p0.x) * tension) / 3;
+      const cp1y = p1.y + ((p2.y - p0.y) * tension) / 3;
+      const cp2x = p2.x - ((p3.x - p1.x) * tension) / 3;
+      const cp2y = p2.y - ((p3.y - p1.y) * tension) / 3;
+
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    }
+  }
+
+  // Create vertical gradient for a color (matching lore-web style)
+  function createGradient(
+    ctx: CanvasRenderingContext2D,
+    color: string,
+    top: number,
+    bottom: number
+  ): CanvasGradient {
+    const gradient = ctx.createLinearGradient(0, top, 0, bottom);
+    gradient.addColorStop(0, hexToRgba(color, 0.5));
+    gradient.addColorStop(0.2, hexToRgba(color, 0.3));
+    gradient.addColorStop(0.5, hexToRgba(color, 0.12));
+    gradient.addColorStop(0.8, hexToRgba(color, 0.04));
+    gradient.addColorStop(1, hexToRgba(color, 0));
+    return gradient;
+  }
 
   // Setup resize observer
   onMount(() => {
@@ -279,6 +325,7 @@
 
     // === DRAW EVENT DENSITY ===
     const densityChartHeight = densityHeight - 20; // Leave room for labels
+    const chartBottom = densityTop + densityChartHeight;
 
     if (buckets.length === 0 || maxCount === 0) {
       ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
@@ -288,48 +335,50 @@
     } else {
       const bucketWidth = chartWidth / buckets.length;
 
-      // Draw stacked areas
-      for (const type of STACK_ORDER) {
-        ctx.fillStyle = TYPE_COLORS[type];
-        ctx.beginPath();
-        ctx.moveTo(PADDING.left, densityTop + densityChartHeight);
+      // Draw overlapping areas (NOT stacked) - each type from its value to baseline
+      // Draw in reverse order so higher-priority types render on top
+      const reversedOrder = [...STACK_ORDER].reverse();
 
+      for (const type of reversedOrder) {
+        // Build points for this type's values only (not cumulative)
+        const points: { x: number; y: number }[] = [];
         for (let i = 0; i < buckets.length; i++) {
           const bucket = buckets[i];
           const x = PADDING.left + i * bucketWidth + bucketWidth / 2;
-
-          let cumulativeCount = 0;
-          for (const t of STACK_ORDER) {
-            cumulativeCount += bucket[t];
-            if (t === type) break;
-          }
-
-          const y = densityTop + densityChartHeight - (cumulativeCount / maxCount) * densityChartHeight;
-
-          if (i === 0) ctx.lineTo(PADDING.left, y);
-          ctx.lineTo(x, y);
-          if (i === buckets.length - 1) ctx.lineTo(PADDING.left + chartWidth, y);
+          const value = bucket[type];
+          const y = chartBottom - (value / maxCount) * densityChartHeight;
+          points.push({ x, y });
         }
 
-        for (let i = buckets.length - 1; i >= 0; i--) {
-          const bucket = buckets[i];
-          const x = PADDING.left + i * bucketWidth + bucketWidth / 2;
+        // Skip if no data for this type
+        const hasData = points.some(p => p.y < chartBottom);
+        if (!hasData) continue;
 
-          let cumulativeCount = 0;
-          for (const t of STACK_ORDER) {
-            if (t === type) break;
-            cumulativeCount += bucket[t];
-          }
+        // Calculate gradient from top of line to baseline
+        const minY = Math.min(...points.map(p => p.y));
+        const gradient = createGradient(ctx, TYPE_COLORS[type], minY, chartBottom);
 
-          const y = densityTop + densityChartHeight - (cumulativeCount / maxCount) * densityChartHeight;
+        // Draw gradient-filled area from line to baseline
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        buildSmoothPath(ctx, points, 0.3);
 
-          if (i === buckets.length - 1) ctx.lineTo(PADDING.left + chartWidth, y);
-          ctx.lineTo(x, y);
-          if (i === 0) ctx.lineTo(PADDING.left, y);
+        // Close path to baseline
+        if (points.length > 0) {
+          ctx.lineTo(points[points.length - 1].x, chartBottom);
+          ctx.lineTo(points[0].x, chartBottom);
+          ctx.closePath();
+          ctx.fill();
         }
 
-        ctx.closePath();
-        ctx.fill();
+        // Draw crisp line on top
+        ctx.strokeStyle = TYPE_COLORS[type];
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        buildSmoothPath(ctx, points, 0.3);
+        ctx.stroke();
       }
     }
 
