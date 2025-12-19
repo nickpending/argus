@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRight, ChevronDown } from 'lucide-svelte';
+  import { ChevronRight, ChevronDown, Eye, EyeOff, X } from 'lucide-svelte';
   import sessionsStore, { type Session, type Agent } from '../stores/sessions.svelte';
   import eventsStore from '../stores/events.svelte';
 
@@ -115,11 +115,17 @@
   <div class="tree-controls">
     <label class="show-ended-toggle">
       <input type="checkbox" bind:checked={showEnded} />
+      {#if showEnded}
+        <Eye size={14} />
+      {:else}
+        <EyeOff size={14} />
+      {/if}
       <span>show ended</span>
     </label>
     {#if selectedSessionId || selectedAgentId}
       <button class="clear-btn" onclick={() => { sessionsStore.selectSession(null); }}>
-        show all
+        <X size={12} />
+        <span>clear</span>
       </button>
     {/if}
   </div>

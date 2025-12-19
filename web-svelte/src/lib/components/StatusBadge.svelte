@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Layers } from 'lucide-svelte';
+
   type Status = 'started' | 'completed' | 'failed' | 'background';
 
   interface Props {
@@ -17,7 +19,7 @@
 
 <span class="status-badge {getStatusClass(status)}">{status}</span>
 {#if showBackground}
-  <span class="bg-indicator">bg</span>
+  <span class="bg-indicator"><Layers size={10} /></span>
 {/if}
 
 <style>

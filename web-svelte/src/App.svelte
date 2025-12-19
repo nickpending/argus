@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Activity, Settings, Download } from 'lucide-svelte';
+  import { Activity, Settings, Download, Users, Zap, AlertTriangle } from 'lucide-svelte';
   import { onMount } from 'svelte';
   import websocket, { type ConnectionStatus } from './lib/stores/websocket.svelte';
   import eventsStore from './lib/stores/events.svelte';
@@ -60,9 +60,9 @@
         <span class="status-text">{connectionStatus === 'connected' ? 'connected' : connectionStatus === 'connecting' ? 'connecting...' : 'disconnected'}</span>
       </div>
       <div class="header-metrics">
-        <span class="metric"><span class="metric-value">{metrics.activeSessions}</span> sessions</span>
-        <span class="metric"><span class="metric-value">{metrics.eventsPerMin}</span>/min</span>
-        <span class="metric" class:has-errors={metrics.errorCount > 0}><span class="metric-value">{metrics.errorCount}</span> errors</span>
+        <span class="metric"><Users size={14} /><span class="metric-value">{metrics.activeSessions}</span></span>
+        <span class="metric"><Zap size={14} /><span class="metric-value">{metrics.eventsPerMin}</span>/min</span>
+        <span class="metric" class:has-errors={metrics.errorCount > 0}><AlertTriangle size={14} /><span class="metric-value">{metrics.errorCount}</span></span>
       </div>
     </div>
     <div class="header-controls">
@@ -221,6 +221,9 @@
   }
 
   .metric {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
     font-size: var(--text-sm);
     color: var(--vw-gray);
     white-space: nowrap;
@@ -229,7 +232,6 @@
   .metric-value {
     font-weight: 600;
     color: var(--vw-cyan);
-    margin-right: 0.25rem;
   }
 
   .metric.has-errors .metric-value {

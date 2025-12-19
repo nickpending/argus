@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Search } from 'lucide-svelte';
   import filtersStore, { type TimeRange } from '../stores/filters.svelte';
 
   // Local state synced from store
@@ -78,13 +79,16 @@
     {/each}
   </select>
 
-  <input
-    type="text"
-    class="filter-search"
-    placeholder="search events..."
-    value={search}
-    oninput={handleSearchInput}
-  />
+  <div class="search-wrapper">
+    <Search size={14} class="search-icon" />
+    <input
+      type="text"
+      class="filter-search"
+      placeholder="search events..."
+      value={search}
+      oninput={handleSearchInput}
+    />
+  </div>
 
   <div class="time-range-btns">
     <button
@@ -141,9 +145,23 @@
     outline: none;
   }
 
+  .search-wrapper {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-wrapper :global(.search-icon) {
+    position: absolute;
+    left: 0.75rem;
+    color: var(--vw-gray);
+    pointer-events: none;
+  }
+
   .filter-search {
     flex: 1;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 0.75rem 0.5rem 2rem;
     background: var(--vw-bg-elevated);
     border: 1px solid var(--vw-border);
     border-radius: 4px;
