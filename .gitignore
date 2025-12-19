@@ -262,3 +262,7 @@ __marimo__/
 # Use leading slash to only match root-level directories
 /lib/
 /lib64/
+
+# Base compliance patterns (auto-added by gitignore-check)
+lib/
+lib64/

@@ -40,6 +40,7 @@
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
+      .replace(/\\n/g, '\n')  // Convert escaped newlines to actual newlines
       .replace(/"([^"]+)":/g, '<span class="json-key">"$1"</span>:')
       .replace(/: "([^"]*)"/g, ': <span class="json-string">"$1"</span>')
       .replace(/: (\d+\.?\d*)/g, ': <span class="json-number">$1</span>')
@@ -192,7 +193,7 @@
   }
 
   .detail-value.mono {
-    font-family: var(--font-mono);
+    font-family: var(--vw-font-mono);
   }
 
   .detail-section {
@@ -214,7 +215,7 @@
   }
 
   .detail-json {
-    font-family: var(--font-mono);
+    font-family: var(--vw-font-mono);
     font-size: var(--text-xs);
     background: var(--vw-bg-deep);
     border: 1px solid var(--vw-border);

@@ -4,21 +4,27 @@
   import websocket, { type ConnectionStatus } from './lib/stores/websocket.svelte';
   import eventsStore from './lib/stores/events.svelte';
   import sessionsStore from './lib/stores/sessions.svelte';
-  import metricsStore from './lib/stores/metrics.svelte';
+  import metricsStore, { type Metrics } from './lib/stores/metrics.svelte';
   import SessionTree from './lib/components/SessionTree.svelte';
   import EventTable from './lib/components/EventTable.svelte';
   import DetailPanel from './lib/components/DetailPanel.svelte';
-  import MetricsBar from './lib/components/MetricsBar.svelte';
   import FilterBar from './lib/components/FilterBar.svelte';
   import CombinedTimeline from './lib/components/CombinedTimeline.svelte';
 
   let connectionStatus = $state<ConnectionStatus>('disconnected');
+  let metrics = $state<Metrics>({
+    activeSessions: 0,
+    eventsPerMin: 0,
+    errorCount: 0,
+    avgLatency: '—',
+  });
 
   // Sync connection status and update metrics from stores
   $effect(() => {
     const interval = setInterval(() => {
       connectionStatus = websocket.getStatus();
       metricsStore.updateMetrics();
+      metrics = metricsStore.getMetrics();
     }, 100);
     return () => clearInterval(interval);
   });
@@ -51,7 +57,12 @@
       </h1>
       <div class="status-indicator">
         <span class="status-dot {connectionStatus}"></span>
-        <span class="status-text">{connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}</span>
+        <span class="status-text">{connectionStatus === 'connected' ? 'connected' : connectionStatus === 'connecting' ? 'connecting...' : 'disconnected'}</span>
+      </div>
+      <div class="header-metrics">
+        <span class="metric"><span class="metric-value">{metrics.activeSessions}</span> sessions</span>
+        <span class="metric"><span class="metric-value">{metrics.eventsPerMin}</span>/min</span>
+        <span class="metric" class:has-errors={metrics.errorCount > 0}><span class="metric-value">{metrics.errorCount}</span> errors</span>
       </div>
     </div>
     <div class="header-controls">
@@ -65,11 +76,6 @@
       </button>
     </div>
   </header>
-
-  <!-- Metrics Bar -->
-  <div class="metrics-area">
-    <MetricsBar />
-  </div>
 
   <!-- Left Panel: Sessions -->
   <aside class="panel left-panel">
@@ -108,10 +114,9 @@
     display: grid;
     grid-template-areas:
       "header header header"
-      "metrics metrics metrics"
       "left center right";
     grid-template-columns: minmax(240px, 280px) 1fr minmax(320px, 380px);
-    grid-template-rows: var(--header-height) auto 1fr;
+    grid-template-rows: var(--header-height) 1fr;
     overflow: hidden;
   }
 
@@ -205,10 +210,30 @@
     color: var(--vw-gray);
   }
 
-  /* Metrics Area */
-  .metrics-area {
-    grid-area: metrics;
-    border-bottom: 1px solid var(--vw-border);
+  /* Header Metrics (inline) */
+  .header-metrics {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding-left: 1rem;
+    border-left: 1px solid var(--vw-border);
+    margin-left: 0.5rem;
+  }
+
+  .metric {
+    font-size: var(--text-sm);
+    color: var(--vw-gray);
+    white-space: nowrap;
+  }
+
+  .metric-value {
+    font-weight: 600;
+    color: var(--vw-cyan);
+    margin-right: 0.25rem;
+  }
+
+  .metric.has-errors .metric-value {
+    color: var(--vw-danger);
   }
 
   /* Panels */

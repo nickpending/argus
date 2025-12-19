@@ -194,7 +194,7 @@
   }
 
   .time-cell {
-    font-family: var(--font-mono);
+    font-family: var(--vw-font-mono);
     color: var(--vw-gray);
     white-space: nowrap;
   }

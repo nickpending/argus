@@ -688,7 +688,7 @@
 
   .tooltip-time {
     color: var(--vw-cyan);
-    font-family: var(--font-mono);
+    font-family: var(--vw-font-mono);
     margin-bottom: 0.25rem;
   }
 
@@ -703,7 +703,7 @@
 
   .tooltip-header {
     color: var(--vw-cyan);
-    font-family: var(--font-mono);
+    font-family: var(--vw-font-mono);
     font-weight: 600;
     margin-bottom: 0.5rem;
     padding-bottom: 0.25rem;
@@ -723,7 +723,7 @@
 
   .tooltip-value {
     color: var(--vw-text);
-    font-family: var(--font-mono);
+    font-family: var(--vw-font-mono);
   }
 
   .tooltip-value.status-running {
@@ -743,7 +743,7 @@
     padding-top: 0.25rem;
     border-top: 1px solid var(--vw-border);
     color: var(--vw-gray);
-    font-family: var(--font-mono);
+    font-family: var(--vw-font-mono);
     font-size: 0.65rem;
   }
 </style>
