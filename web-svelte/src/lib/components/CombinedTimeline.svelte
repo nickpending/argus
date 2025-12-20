@@ -27,20 +27,20 @@
   const SWIMLANE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes for agent lifecycles
   const DENSITY_WINDOW_MS = 5 * 60 * 1000;   // 5 minutes for event density
 
-  // Layout proportions
-  const SWIMLANE_RATIO = 0.6;
-  const DENSITY_RATIO = 0.4;
+  // Layout proportions - swimlanes get more space, density is compact
+  const SWIMLANE_RATIO = 0.65;
+  const DENSITY_RATIO = 0.35;
 
-  // Padding - balanced left/right for visual alignment, top space for labels
-  const PADDING = { top: 24, right: 60, bottom: 30, left: 100 };
+  // Small margins to match other dashboard cards
+  const PADDING = { top: 24, right: 8, bottom: 30, left: 8 };
 
-  // Agent type fill patterns/colors
-  const AGENT_STYLES: Record<string, { color: string; pattern: 'solid' | 'diagonal' | 'crosshatch' | 'dots' }> = {
-    'Explore': { color: '#00D9FF', pattern: 'diagonal' },
-    'code-reviewer': { color: '#9F4DFF', pattern: 'crosshatch' },
-    'general-purpose': { color: '#E6CCFF', pattern: 'dots' },
-    'claude-code-guide': { color: '#4a9e6b', pattern: 'solid' },
-    'default': { color: '#666666', pattern: 'solid' },
+  // Agent type colors (solid fills, no patterns)
+  const AGENT_COLORS: Record<string, string> = {
+    'Explore': '#00D9FF',
+    'code-reviewer': '#9F4DFF',
+    'general-purpose': '#E6CCFF',
+    'claude-code-guide': '#4a9e6b',
+    'default': '#666666',
   };
 
   // Event type colors for density chart (solid colors for gradient creation)
@@ -84,7 +84,8 @@
     }
   }
 
-  // Create vertical gradient for a color (matching lore-web style)
+  // Create vertical gradient for a color (matching mockup style)
+  // Gradient holds solid at top, then fades
   function createGradient(
     ctx: CanvasRenderingContext2D,
     color: string,
@@ -92,10 +93,9 @@
     bottom: number
   ): CanvasGradient {
     const gradient = ctx.createLinearGradient(0, top, 0, bottom);
-    gradient.addColorStop(0, hexToRgba(color, 0.5));
-    gradient.addColorStop(0.2, hexToRgba(color, 0.3));
-    gradient.addColorStop(0.5, hexToRgba(color, 0.12));
-    gradient.addColorStop(0.8, hexToRgba(color, 0.04));
+    gradient.addColorStop(0, hexToRgba(color, 0.6));
+    gradient.addColorStop(0.2, hexToRgba(color, 0.6));  // Hold solid until 20%
+    gradient.addColorStop(0.5, hexToRgba(color, 0.25));
     gradient.addColorStop(1, hexToRgba(color, 0));
     return gradient;
   }
@@ -221,16 +221,22 @@
     const swimlaneTop = PADDING.top;
     const densityTop = PADDING.top + swimlaneHeight;
 
+    // Density chart area - space for label at top, waves go to bottom
+    const densityLabelHeight = 20;
+    const densityChartTop = densityTop + densityLabelHeight;
+    const densityChartHeight = densityHeight - densityLabelHeight;
+    const chartBottom = densityChartTop + densityChartHeight;
+
     const now = Date.now();
     const swimlaneWindowStart = now - SWIMLANE_WINDOW_MS;
     const densityWindowStart = now - DENSITY_WINDOW_MS;
 
-    // Draw section labels
+    // Draw section labels with letter-spacing (0.1em at 10px = 1px)
     ctx.fillStyle = '#666666';
-    ctx.font = '11px Inter, sans-serif';
+    ctx.font = '10px Inter, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('ACTIVE AGENTS', PADDING.left, swimlaneTop - 2);
-    ctx.fillText('EVENT DENSITY', PADDING.left, densityTop + 12);
+    drawSpacedText(ctx, 'ACTIVE AGENTS', PADDING.left, swimlaneTop - 2, 1);
+    drawSpacedText(ctx, 'EVENT DENSITY', PADDING.left, densityTop + 12, 1);
 
     // Draw vertical grid lines for swimlane section (every minute over 10min = 10 lines)
     ctx.strokeStyle = 'rgba(51, 51, 51, 0.3)';
@@ -258,8 +264,8 @@
       }
       const x = PADDING.left + (i / 10) * chartWidth;
       ctx.beginPath();
-      ctx.moveTo(x, densityTop);
-      ctx.lineTo(x, densityTop + densityHeight);
+      ctx.moveTo(x, densityChartTop);
+      ctx.lineTo(x, chartBottom);
       ctx.stroke();
     }
 
@@ -303,30 +309,27 @@
         // Store bar position for hit detection
         agentBars.push({ agent, x: xStart, y, width: barWidth, height: barHeight });
 
-        // Get style for this agent type
+        // Get color for this agent type
         const agentType = agent.type || agent.name || 'default';
-        const style = AGENT_STYLES[agentType] || AGENT_STYLES['default'];
+        const color = AGENT_COLORS[agentType] || AGENT_COLORS['default'];
 
         // Highlight hovered agent
         const isHovered = hoveredAgent?.id === agent.id;
 
-        // Draw bar with pattern
-        drawPatternedBar(ctx, xStart, y, barWidth, barHeight, style.color, style.pattern, agent.status === 'running', isHovered);
+        // Draw solid bar with left accent
+        drawAgentBar(ctx, xStart, y, barWidth, barHeight, color, agent.status === 'running', isHovered);
 
-        // Draw agent label
+        // Draw agent label just left of where the bar starts
         ctx.fillStyle = isHovered ? '#FFFFFF' : '#BBBBBB';
         ctx.font = '11px Inter, sans-serif';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
         const label = (agent.type || agent.name || agent.id.slice(0, 7));
-        ctx.fillText(label, PADDING.left - 8, y + barHeight / 2);
+        ctx.fillText(label, xStart - 8, y + barHeight / 2);
       });
     }
 
     // === DRAW EVENT DENSITY ===
-    const densityChartHeight = densityHeight - 20; // Leave room for labels
-    const chartBottom = densityTop + densityChartHeight;
-
     if (buckets.length === 0 || maxCount === 0) {
       ctx.fillStyle = 'rgba(128, 128, 128, 0.5)';
       ctx.font = '12px Inter, sans-serif';
@@ -346,7 +349,12 @@
           const bucket = buckets[i];
           const x = PADDING.left + i * bucketWidth + bucketWidth / 2;
           const value = bucket[type];
-          const y = chartBottom - (value / maxCount) * densityChartHeight;
+          // Use square root scaling for better visibility of small values
+          // Also ensure non-zero values have minimum 15% height
+          let normalizedValue = value > 0
+            ? Math.max(0.15, Math.sqrt(value) / Math.sqrt(maxCount))
+            : 0;
+          const y = chartBottom - normalizedValue * densityChartHeight;
           points.push({ x, y });
         }
 
@@ -354,14 +362,15 @@
         const hasData = points.some(p => p.y < chartBottom);
         if (!hasData) continue;
 
-        // Calculate gradient from top of line to baseline
-        const minY = Math.min(...points.map(p => p.y));
-        const gradient = createGradient(ctx, TYPE_COLORS[type], minY, chartBottom);
+        // Fixed gradient from chart top to baseline (like SVG userSpaceOnUse)
+        // This ensures consistent opacity at any y-coordinate regardless of peak height
+        const gradient = createGradient(ctx, TYPE_COLORS[type], densityChartTop, chartBottom);
 
         // Draw gradient-filled area from line to baseline
+        // Higher tension (0.5) for more dramatic curves like mockup
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        buildSmoothPath(ctx, points, 0.3);
+        buildSmoothPath(ctx, points, 0.5);
 
         // Close path to baseline
         if (points.length > 0) {
@@ -377,7 +386,7 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.beginPath();
-        buildSmoothPath(ctx, points, 0.3);
+        buildSmoothPath(ctx, points, 0.5);
         ctx.stroke();
       }
     }
@@ -406,7 +415,6 @@
     // === DRAW SWIMLANE TIME AXIS (above divider) ===
     ctx.fillStyle = 'rgba(128, 128, 128, 0.6)';
     ctx.font = '9px "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
 
     // Swimlane: labels every minute (11 labels over 10 min)
     for (let i = 0; i <= 10; i++) {
@@ -417,6 +425,8 @@
         minute: '2-digit'
       });
       const x = PADDING.left + (i / 10) * chartWidth;
+      // Edge labels aligned to stay in bounds
+      ctx.textAlign = i === 0 ? 'left' : i === 10 ? 'right' : 'center';
       ctx.fillText(label, x, densityTop - 4);
     }
 
@@ -434,86 +444,54 @@
         second: '2-digit'
       });
       const x = PADDING.left + (i / 5) * chartWidth;
+      // Edge labels aligned to stay in bounds
+      ctx.textAlign = i === 0 ? 'left' : i === 5 ? 'right' : 'center';
       ctx.fillText(label, x, height - 8);
     }
 
     ctx.restore();
   }
 
-  // Draw a bar with fill pattern
-  function drawPatternedBar(
+  // Draw a solid agent bar with left accent border
+  function drawAgentBar(
     ctx: CanvasRenderingContext2D,
     x: number,
     y: number,
     width: number,
     height: number,
     color: string,
-    pattern: 'solid' | 'diagonal' | 'crosshatch' | 'dots',
     isRunning: boolean,
     isHovered: boolean = false
   ): void {
     const radius = 4;
+    const accentWidth = 2;
 
-    // Draw base bar
-    ctx.fillStyle = isRunning ? color : hexToRgba(color, 0.6);
+    // Draw muted fill
+    ctx.fillStyle = hexToRgba(color, isRunning ? 0.18 : 0.12);
     ctx.beginPath();
     ctx.roundRect(x, y, width, height, radius);
     ctx.fill();
 
+    // Draw left accent border
+    ctx.fillStyle = hexToRgba(color, isRunning ? 0.7 : 0.5);
+    ctx.beginPath();
+    ctx.roundRect(x, y, accentWidth, height, [radius, 0, 0, radius]);
+    ctx.fill();
+
     // Hover highlight border
     if (isHovered) {
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = hexToRgba(color, 0.8);
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.roundRect(x, y, width, height, radius);
       ctx.stroke();
     }
 
-    // Draw pattern overlay
-    ctx.save();
-    ctx.beginPath();
-    ctx.roundRect(x, y, width, height, radius);
-    ctx.clip();
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
-
-    if (pattern === 'diagonal') {
-      for (let i = -height; i < width + height; i += 6) {
-        ctx.beginPath();
-        ctx.moveTo(x + i, y);
-        ctx.lineTo(x + i + height, y + height);
-        ctx.stroke();
-      }
-    } else if (pattern === 'crosshatch') {
-      for (let i = -height; i < width + height; i += 8) {
-        ctx.beginPath();
-        ctx.moveTo(x + i, y);
-        ctx.lineTo(x + i + height, y + height);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x + i + height, y);
-        ctx.lineTo(x + i, y + height);
-        ctx.stroke();
-      }
-    } else if (pattern === 'dots') {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      for (let dx = 4; dx < width; dx += 8) {
-        for (let dy = 4; dy < height; dy += 8) {
-          ctx.beginPath();
-          ctx.arc(x + dx, y + dy, 1.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-    }
-
-    ctx.restore();
-
     // Running indicator (pulsing dot)
     if (isRunning) {
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
-      ctx.arc(x + width - 4, y + height / 2, 3, 0, Math.PI * 2);
+      ctx.arc(x + width - 6, y + height / 2, 3, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -523,6 +501,21 @@
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+
+  // Draw text with letter-spacing (canvas doesn't support it natively)
+  function drawSpacedText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    spacing: number = 1
+  ): void {
+    let currentX = x;
+    for (const char of text) {
+      ctx.fillText(char, currentX, y);
+      currentX += ctx.measureText(char).width + spacing;
+    }
   }
 
   function updateCanvasSize(): void {
