@@ -131,3 +131,12 @@ body {
     background: var(--vw-cyan-subtle);
     color: var(--vw-white);
 }
+
+/* Idle session treatment */
+.tree-item.idle {
+    opacity: 0.6;
+}
+
+.tree-item.idle .idle-icon {
+    color: var(--vw-gray);
+}

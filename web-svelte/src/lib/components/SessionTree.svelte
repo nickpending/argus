@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ChevronRight, ChevronDown, Eye, EyeOff, X } from 'lucide-svelte';
+  import { ChevronRight, ChevronDown, Eye, EyeOff, X, Clock } from 'lucide-svelte';
   import sessionsStore, { type Session, type Agent } from '../stores/sessions.svelte';
   import eventsStore from '../stores/events.svelte';
 
@@ -139,7 +139,7 @@
       {@const expanded = isExpanded(`session-${session.id}`)}
       {@const isSelected = selectedSessionId === session.id}
 
-      <div class="tree-item session" class:selected={isSelected}>
+      <div class="tree-item session" class:selected={isSelected} class:idle={session.is_idle}>
         <button
           class="tree-row"
           onclick={() => handleSessionClick(session)}
@@ -154,6 +154,9 @@
             {/if}
           </span>
           <span class="status-dot {session.status}"></span>
+          {#if session.is_idle}
+            <Clock size={14} class="idle-icon" />
+          {/if}
           <span class="tree-label">{session.id.slice(0, 8)}</span>
           {#if session.project}
             <span class="project-badge">{session.project}</span>

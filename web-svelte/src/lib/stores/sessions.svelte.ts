@@ -14,6 +14,7 @@ export interface Session {
   created_at?: string;
   completed_at?: string;
   last_event_time?: string; // Track last activity for staleness detection
+  is_idle?: boolean; // Active session with no events for 10+ minutes
 }
 
 // Agent interface
@@ -209,6 +210,7 @@ interface SessionResponse {
   ended_at?: string;
   status: "active" | "ended";
   agent_count?: number;
+  is_idle?: boolean;
 }
 
 interface AgentResponse {
@@ -257,6 +259,7 @@ async function loadInitialData(): Promise<void> {
         status: s.status,
         created_at: s.started_at,
         completed_at: s.ended_at,
+        is_idle: s.is_idle,
       });
     }
 
