@@ -3,7 +3,7 @@
 import json
 import sqlite3
 import threading
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -348,20 +348,26 @@ class Database:
         return [str(row[0]) for row in rows]
 
     def get_sessions(self) -> list[dict[str, Any]]:
-        """Get list of sessions with agent counts.
+        """Get list of sessions with agent counts and idle state.
 
         Returns:
-            List of session dicts with id, project, started_at, ended_at, status, agent_count
+            List of session dicts with id, project, started_at, ended_at, status,
+            agent_count, is_idle
         """
         cursor = self.conn.execute("""
             SELECT s.id, s.project, s.started_at, s.ended_at, s.status,
-                   COUNT(a.id) as agent_count
+                   COUNT(a.id) as agent_count,
+                   (SELECT MAX(timestamp) FROM events WHERE session_id = s.id) as last_event_time
             FROM sessions s
             LEFT JOIN agents a ON a.session_id = s.id
             GROUP BY s.id
             ORDER BY s.started_at DESC
         """)
         rows = cursor.fetchall()
+
+        # Current time for idle calculation
+        now = datetime.now(UTC)
+
         return [
             {
                 "id": row[0],
@@ -370,9 +376,37 @@ class Database:
                 "ended_at": row[3],
                 "status": row[4],
                 "agent_count": row[5],
+                "is_idle": self._calculate_idle(row[4], row[6], now),
             }
             for row in rows
         ]
+
+    def _calculate_idle(self, status: str, last_event_time: str | None, now: datetime) -> bool:
+        """Calculate if session is idle.
+
+        A session is idle if:
+        - status is 'active' AND
+        - (no events exist OR last event was >10 minutes ago)
+
+        Args:
+            status: Session status
+            last_event_time: ISO8601 timestamp of most recent event, or None
+            now: Current datetime for comparison
+
+        Returns:
+            True if session is idle, False otherwise
+        """
+        if status != "active":
+            return False
+
+        if last_event_time is None:
+            return True  # Active session with no events is idle
+
+        # Parse timestamp and compare
+        last_event_dt = datetime.fromisoformat(last_event_time.replace("Z", "+00:00"))
+        idle_threshold = timedelta(minutes=10)
+
+        return (now - last_event_dt) > idle_threshold
 
     def get_agents(self, session_id: str | None = None) -> list[dict[str, Any]]:
         """Get list of agents, optionally filtered by session.
@@ -729,7 +763,6 @@ class Database:
         Returns:
             Number of events deleted
         """
-        from datetime import timedelta
 
         # Calculate cutoff timestamp (events older than this will be deleted)
         cutoff = datetime.now(UTC) - timedelta(days=retention_days)

@@ -192,6 +192,9 @@ class SessionResponse(BaseModel):
     ended_at: str | None = Field(None, description="ISO8601 end timestamp")
     status: str = Field(..., description="Session status (active/ended)")
     agent_count: int = Field(..., description="Number of agents in session")
+    is_idle: bool = Field(
+        ..., description="Whether session is idle (active with no events for 10+ minutes)"
+    )
 
 
 class SessionListResponse(BaseModel):
