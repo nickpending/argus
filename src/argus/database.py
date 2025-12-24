@@ -452,7 +452,7 @@ class Database:
         ]
 
     def get_session_by_id(self, session_id: str) -> dict[str, Any] | None:
-        """Get single session by ID with agent count.
+        """Get single session by ID with agent count and idle state.
 
         Args:
             session_id: Session identifier
@@ -463,7 +463,8 @@ class Database:
         cursor = self.conn.execute(
             """
             SELECT s.id, s.project, s.started_at, s.ended_at, s.status,
-                   COUNT(a.id) as agent_count
+                   COUNT(a.id) as agent_count,
+                   (SELECT MAX(timestamp) FROM events WHERE session_id = s.id) as last_event_time
             FROM sessions s
             LEFT JOIN agents a ON a.session_id = s.id
             WHERE s.id = ?
@@ -474,6 +475,8 @@ class Database:
         row = cursor.fetchone()
         if row is None:
             return None
+
+        now = datetime.now(UTC)
         return {
             "id": row[0],
             "project": row[1],
@@ -481,6 +484,7 @@ class Database:
             "ended_at": row[3],
             "status": row[4],
             "agent_count": row[5],
+            "is_idle": self._calculate_idle(row[4], row[6], now),
         }
 
     def get_agent_by_id(self, agent_id: str) -> dict[str, Any] | None:

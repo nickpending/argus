@@ -544,6 +544,42 @@ async def get_agents(
     return AgentListResponse(agents=agents)
 
 
+# PATCH /sessions/{session_id} endpoint - Manually close a session
+@app.patch("/sessions/{session_id}")
+async def close_session(
+    session_id: str,
+    request: Request,
+    _api_key: str = Depends(verify_api_key),
+) -> dict:
+    """Manually close a session by setting status to ended.
+
+    Args:
+        session_id: Session identifier
+        request: FastAPI request for app.state access
+        _api_key: Validated API key (via dependency)
+
+    Returns:
+        Updated session object
+
+    Raises:
+        HTTPException: 404 if session not found, 401 if invalid API key
+    """
+    db = request.app.state.db
+    ws_manager = request.app.state.ws_manager
+
+    if not db.update_session_ended(session_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session not found: {session_id}",
+        )
+
+    session_data = db.get_session_by_id(session_id)
+    if session_data:
+        asyncio.create_task(ws_manager.broadcast_lifecycle("session_ended", session_data))
+
+    return session_data
+
+
 # WebSocket /ws endpoint - Real-time event streaming with auth and filtering
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
