@@ -178,3 +178,70 @@ class Event(BaseModel):
     message: str | None = Field(default=None, description="Human-readable description")
     level: str | None = Field(default=None, description="Log level")
     data: dict[str, Any] | None = Field(default=None, description="Arbitrary JSON data")
+
+
+# API Response Models
+
+
+class SessionResponse(BaseModel):
+    """Response model for a single session."""
+
+    id: str = Field(..., description="Session identifier")
+    project: str | None = Field(None, description="Project name")
+    started_at: str = Field(..., description="ISO8601 start timestamp")
+    ended_at: str | None = Field(None, description="ISO8601 end timestamp")
+    status: str = Field(..., description="Session status (active/ended)")
+    agent_count: int = Field(..., description="Number of agents in session")
+
+
+class SessionListResponse(BaseModel):
+    """Response model for list of sessions."""
+
+    sessions: list[SessionResponse] = Field(..., description="List of sessions")
+
+
+class AgentResponse(BaseModel):
+    """Response model for a single agent."""
+
+    id: str = Field(..., description="Agent identifier")
+    type: str = Field(..., description="Agent type")
+    name: str | None = Field(None, description="Agent name")
+    session_id: str = Field(..., description="Parent session ID")
+    parent_agent_id: str | None = Field(None, description="Parent agent ID if nested")
+    status: str = Field(..., description="Agent status")
+    created_at: str = Field(..., description="ISO8601 creation timestamp")
+    completed_at: str | None = Field(None, description="ISO8601 completion timestamp")
+    event_count: int = Field(..., description="Number of events from this agent")
+
+
+class AgentListResponse(BaseModel):
+    """Response model for list of agents."""
+
+    agents: list[AgentResponse] = Field(..., description="List of agents")
+
+
+class EventResponse(BaseModel):
+    """Response model for a single event."""
+
+    id: int = Field(..., description="Event ID")
+    source: str = Field(..., description="Event source")
+    event_type: str = Field(..., description="Event type")
+    timestamp: str = Field(..., description="ISO8601 timestamp")
+    message: str | None = Field(None, description="Event message")
+    level: str | None = Field(None, description="Log level")
+    data: dict[str, Any] | None = Field(None, description="Additional event data")
+    created_at: str = Field(..., description="Database creation timestamp")
+    session_id: str | None = Field(None, description="Session ID")
+    hook: str | None = Field(None, description="Claude Code hook")
+    tool_name: str | None = Field(None, description="Tool name")
+    tool_use_id: str | None = Field(None, description="Tool use correlation ID")
+    status: str | None = Field(None, description="Event status")
+    agent_id: str | None = Field(None, description="Agent ID")
+    is_background: bool | None = Field(None, description="Background execution flag")
+
+
+class EventListResponse(BaseModel):
+    """Response model for list of events."""
+
+    events: list[EventResponse] = Field(..., description="List of events")
+    total: int = Field(..., description="Total count returned")

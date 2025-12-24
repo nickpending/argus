@@ -22,7 +22,12 @@ from fastapi.staticfiles import StaticFiles
 
 from argus.config import load_config
 from argus.database import Database
-from argus.models import EventCreate
+from argus.models import (
+    AgentListResponse,
+    EventCreate,
+    EventListResponse,
+    SessionListResponse,
+)
 from argus.websocket import WebSocketManager
 
 # Configure logging
@@ -376,7 +381,7 @@ async def create_event(
 
 
 # GET /events endpoint - Query historical events with filtering
-@app.get("/events")
+@app.get("/events", response_model=EventListResponse)
 async def query_events(
     request: Request,
     _api_key: str | None = Depends(verify_optional_api_key),
@@ -391,7 +396,7 @@ async def query_events(
     tool_name: str | None = None,
     status_filter: str | None = Query(None, alias="status"),
     agent_id: str | None = None,
-) -> dict[str, Any]:
+) -> EventListResponse:
     """Query events with optional filtering.
 
     Args:
@@ -438,7 +443,7 @@ async def query_events(
         agent_id=agent_id,
     )
 
-    return {"events": events}
+    return EventListResponse(events=events, total=len(events))
 
 
 # GET /sources endpoint - Discovery endpoint for available sources
@@ -490,11 +495,11 @@ async def get_event_types(
 
 
 # GET /sessions endpoint - Discovery endpoint for sessions with agent counts
-@app.get("/sessions")
+@app.get("/sessions", response_model=SessionListResponse)
 async def get_sessions(
     request: Request,
     _api_key: str | None = Depends(verify_optional_api_key),
-) -> dict[str, Any]:
+) -> SessionListResponse:
     """Get list of sessions with agent counts.
 
     Args:
@@ -510,16 +515,16 @@ async def get_sessions(
     db = request.app.state.db
     sessions = db.get_sessions()
 
-    return {"sessions": sessions}
+    return SessionListResponse(sessions=sessions)
 
 
 # GET /agents endpoint - Discovery endpoint for agents with optional session filter
-@app.get("/agents")
+@app.get("/agents", response_model=AgentListResponse)
 async def get_agents(
     request: Request,
     _api_key: str | None = Depends(verify_optional_api_key),
     session_id: str | None = None,
-) -> dict[str, Any]:
+) -> AgentListResponse:
     """Get list of agents, optionally filtered by session.
 
     Args:
@@ -536,7 +541,7 @@ async def get_agents(
     db = request.app.state.db
     agents = db.get_agents(session_id=session_id)
 
-    return {"agents": agents}
+    return AgentListResponse(agents=agents)
 
 
 # WebSocket /ws endpoint - Real-time event streaming with auth and filtering
