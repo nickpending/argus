@@ -202,6 +202,28 @@ function clearAll(): void {
   selectedAgentId = null;
 }
 
+// Close session via API (WebSocket broadcast will update state)
+async function closeSession(sessionId: string): Promise<boolean> {
+  const apiKey = import.meta.env.VITE_ARGUS_API_KEY;
+  try {
+    const res = await fetch(`/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: apiKey ? { "X-API-Key": apiKey } : {},
+    });
+    if (!res.ok) {
+      console.error(
+        `[sessions] Failed to close session ${sessionId}: ${res.status}`,
+      );
+      return false;
+    }
+    console.log(`[sessions] Closed session ${sessionId}`);
+    return true;
+  } catch (err) {
+    console.error(`[sessions] Error closing session ${sessionId}:`, err);
+    return false;
+  }
+}
+
 // API response types (differ slightly from store interfaces)
 interface SessionResponse {
   id: string;
@@ -375,6 +397,7 @@ export const sessionsStore = {
   getSelectedSessionId,
   getSelectedAgentId,
   clearAll,
+  closeSession,
   initializeHandlers,
   loadInitialData,
   updateSessionLastEventTime,

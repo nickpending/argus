@@ -139,7 +139,7 @@
       {@const expanded = isExpanded(`session-${session.id}`)}
       {@const isSelected = selectedSessionId === session.id}
 
-      <div class="tree-item session" class:selected={isSelected} class:idle={session.is_idle}>
+      <div class="tree-item session" class:selected={isSelected}>
         <button
           class="tree-row"
           onclick={() => handleSessionClick(session)}
@@ -154,14 +154,24 @@
             {/if}
           </span>
           <span class="status-dot {session.status}"></span>
-          {#if session.is_idle}
-            <Clock size={14} class="idle-icon" />
-          {/if}
           <span class="tree-label">{session.id.slice(0, 8)}</span>
           {#if session.project}
             <span class="project-badge">{session.project}</span>
           {/if}
           <span class="tree-meta">{agents.length}</span>
+          <span class="indicator clock" class:idle={session.is_idle}>
+            <Clock size={14} />
+          </span>
+          <span
+            class="indicator close"
+            class:active={session.is_idle}
+            onclick={(e) => { e.stopPropagation(); if (session.status === 'active') sessionsStore.closeSession(session.id); }}
+            onkeydown={(e) => { if (e.key === 'Enter' && session.status === 'active') sessionsStore.closeSession(session.id); }}
+            role="button"
+            tabindex="0"
+          >
+            <X size={14} />
+          </span>
         </button>
       </div>
 
@@ -313,5 +323,27 @@
   .tree-children {
     border-left: 1px solid var(--vw-border);
     margin-left: 1rem;
+  }
+
+  /* Indicator columns - always present */
+  .indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vw-dark-gray);
+    flex-shrink: 0;
+  }
+
+  .indicator.clock.idle {
+    color: var(--vw-warning);
+  }
+
+  .indicator.close.active {
+    color: var(--vw-text);
+    cursor: pointer;
+  }
+
+  .indicator.close.active:hover {
+    color: var(--vw-danger);
   }
 </style>
