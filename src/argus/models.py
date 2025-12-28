@@ -101,8 +101,8 @@ class EventCreate(BaseModel):
     source: str = Field(
         ..., min_length=1, max_length=50, description="Producing application identifier"
     )
-    event_type: Literal["tool", "session", "agent", "response", "prompt"] = Field(
-        ..., description="Event category"
+    event_type: Literal["tool", "session", "agent", "response", "prompt", "command", "skill"] = (
+        Field(..., description="Event category")
     )
     timestamp: str | None = Field(default=None, description="ISO8601 timestamp (UTC with Z suffix)")
     message: str | None = Field(
