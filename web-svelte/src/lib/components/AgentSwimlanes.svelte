@@ -168,7 +168,7 @@
       ctx.font = '11px Inter, sans-serif';
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      const label = (agent.type || agent.name || agent.id.slice(0, 7)).slice(0, 14);
+      const label = (agent.name || agent.type || agent.id.slice(0, 7)).slice(0, 14);
       ctx.fillText(label, padding.left - 8, y + barHeight / 2);
 
       // Draw status indicator for running agents

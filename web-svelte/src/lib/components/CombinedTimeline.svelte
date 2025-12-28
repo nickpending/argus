@@ -20,6 +20,9 @@
   let hoveredBucketIndex: number | null = $state(null);
   let hoveredAgent: Agent | null = $state(null);
 
+  // Tooltip positioning constants
+  const TOOLTIP_MARGIN = 8; // Minimum margin from edges
+
   // Store agent bar positions for hit detection
   let agentBars: Array<{ agent: Agent; x: number; y: number; width: number; height: number }> = [];
 
@@ -324,7 +327,7 @@
         ctx.font = '11px Inter, sans-serif';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
-        const label = (agent.type || agent.name || agent.id.slice(0, 7));
+        const label = (agent.name || agent.type || agent.id.slice(0, 7));
         ctx.fillText(label, xStart - 8, y + barHeight / 2);
       });
     }
@@ -590,11 +593,11 @@
     let parent: string | null = null;
     if (agent.parent_agent_id) {
       const parentAgent = agents.find(a => a.id === agent.parent_agent_id);
-      parent = parentAgent ? (parentAgent.type || parentAgent.name || parentAgent.id.slice(0, 8)) : agent.parent_agent_id.slice(0, 8);
+      parent = parentAgent ? (parentAgent.name || parentAgent.type || parentAgent.id.slice(0, 8)) : agent.parent_agent_id.slice(0, 8);
     }
 
     return {
-      type: agent.type || agent.name || 'unknown',
+      type: agent.name || agent.type || 'unknown',
       status: agent.status,
       duration,
       parent,
@@ -616,9 +619,17 @@
 
   {#if agentTooltip && mouseX !== null && mouseY !== null}
     {@const bar = agentBars.find(b => b.agent.id === hoveredAgent?.id)}
+    {@const rawX = bar ? bar.x + bar.width / 2 : mouseX}
+    {@const tooltipWidth = 160}
+    {@const tooltipHeight = 120}
+    {@const clampedX = Math.max(tooltipWidth / 2 + TOOLTIP_MARGIN, Math.min(rawX, containerWidth - tooltipWidth / 2 - TOOLTIP_MARGIN))}
+    {@const belowY = bar ? bar.y + bar.height + 8 : mouseY + 20}
+    {@const aboveY = bar ? bar.y - tooltipHeight - 8 : mouseY - tooltipHeight - 20}
+    {@const wouldOverflowBottom = belowY + tooltipHeight > containerHeight - TOOLTIP_MARGIN}
+    {@const tooltipY = wouldOverflowBottom ? Math.max(TOOLTIP_MARGIN, aboveY) : belowY}
     <div
       class="tooltip agent-tooltip"
-      style="left: {bar ? bar.x + bar.width / 2 : mouseX}px; top: {bar ? bar.y + bar.height + 8 : mouseY + 20}px;"
+      style="left: {clampedX}px; top: {tooltipY}px;"
     >
       <div class="tooltip-header">{agentTooltip.type}</div>
       <div class="tooltip-row">
@@ -642,9 +653,16 @@
       <div class="tooltip-id">{agentTooltip.id}</div>
     </div>
   {:else if densityTooltip && mouseX !== null && mouseY !== null}
+    {@const tooltipWidth = 140}
+    {@const tooltipHeight = 50}
+    {@const clampedX = Math.max(tooltipWidth / 2 + TOOLTIP_MARGIN, Math.min(mouseX, containerWidth - tooltipWidth / 2 - TOOLTIP_MARGIN))}
+    {@const belowY = mouseY + 20}
+    {@const aboveY = mouseY - tooltipHeight - 20}
+    {@const wouldOverflowBottom = belowY + tooltipHeight > containerHeight - TOOLTIP_MARGIN}
+    {@const tooltipY = wouldOverflowBottom ? Math.max(TOOLTIP_MARGIN, aboveY) : belowY}
     <div
       class="tooltip"
-      style="left: {mouseX}px; top: {mouseY + 20}px;"
+      style="left: {clampedX}px; top: {tooltipY}px;"
     >
       <div class="tooltip-time">{densityTooltip.time}</div>
       <div class="tooltip-counts">{densityTooltip.counts}</div>
