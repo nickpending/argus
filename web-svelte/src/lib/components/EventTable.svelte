@@ -49,24 +49,41 @@
     eventsStore.selectEvent(event.id);
   }
 
-  // Derive status from hook and status fields (tool events only)
-  function getToolStatus(event: Event): { status: string; isBackground: boolean } | null {
-    if (event.event_type !== 'tool') return null;
-
+  // Derive display status from hook and status fields
+  function getEventStatus(event: Event): { status: string; isBackground: boolean } | null {
     const isBackground = event.is_background === true;
 
-    // PreToolUse = started (about to execute)
-    if (event.hook === 'PreToolUse') {
-      return { status: 'started', isBackground };
+    // Agent events
+    if (event.event_type === 'agent') {
+      if (event.hook === 'PreToolUse') {
+        return { status: 'pending', isBackground };
+      }
+      if (event.hook === 'SubagentActivated') {
+        return { status: 'activated', isBackground };
+      }
+      if (event.hook === 'PostToolUse') {
+        const status = event.status?.toLowerCase();
+        if (status === 'error' || status === 'failed' || status === 'failure') {
+          return { status: 'failed', isBackground };
+        }
+        return { status: 'completed', isBackground };
+      }
+      return null;
     }
 
-    // PostToolUse = completed or failed based on status
-    if (event.hook === 'PostToolUse') {
-      const status = event.status?.toLowerCase();
-      if (status === 'error' || status === 'failed' || status === 'failure') {
-        return { status: 'failed', isBackground };
+    // Tool events
+    if (event.event_type === 'tool') {
+      if (event.hook === 'PreToolUse') {
+        return { status: 'started', isBackground };
       }
-      return { status: 'completed', isBackground };
+      if (event.hook === 'PostToolUse') {
+        const status = event.status?.toLowerCase();
+        if (status === 'error' || status === 'failed' || status === 'failure') {
+          return { status: 'failed', isBackground };
+        }
+        return { status: 'completed', isBackground };
+      }
+      return null;
     }
 
     return null;
@@ -112,9 +129,9 @@
             <td>{getProject(event)}</td>
             <td><TypeBadge type={event.event_type} /></td>
             <td class="status-cell">
-              {#if getToolStatus(event)}
-                {@const toolStatus = getToolStatus(event)!}
-                <StatusBadge status={toolStatus.status} showBackground={toolStatus.isBackground} />
+              {#if getEventStatus(event)}
+                {@const eventStatus = getEventStatus(event)!}
+                <StatusBadge status={eventStatus.status} showBackground={eventStatus.isBackground} />
               {:else}
                 <span class="no-status">—</span>
               {/if}

@@ -670,11 +670,11 @@ class Database:
         return cursor.rowcount > 0
 
     def activate_pending_agent(self, tool_use_id: str, agent_id: str) -> bool:
-        """Activate pending agent by setting real agent_id while keeping status pending.
+        """Activate pending agent by setting real agent_id and changing status to running.
 
         Called from SubagentActivated when first tool inside subagent fires.
         Updates the agent's id from tool_use_id to the real agent_id.
-        The agent remains in 'pending' status until PostToolUse completes it.
+        The agent transitions to 'running' status until PostToolUse completes it.
 
         Args:
             tool_use_id: Correlation ID from PreToolUse (current agent id)
@@ -686,7 +686,7 @@ class Database:
         cursor = self.conn.execute(
             """
             UPDATE agents
-            SET id = ?
+            SET id = ?, status = 'running'
             WHERE tool_use_id = ? AND status = 'pending'
             """,
             (agent_id, tool_use_id),
