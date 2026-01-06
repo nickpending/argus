@@ -76,6 +76,50 @@ async def cleanup_task(
             logger.error("Cleanup error: %s", e, exc_info=True)
 
 
+async def idle_detection_task(
+    db: Database, ws_manager: WebSocketManager, check_interval: int = 30
+) -> None:
+    """Background task to detect sessions that become idle and broadcast updates.
+
+    Args:
+        db: Database instance
+        ws_manager: WebSocket manager for broadcasting
+        check_interval: Seconds between checks (default 30)
+    """
+    # Track sessions we've already marked as idle to avoid duplicate broadcasts
+    known_idle: set[str] = set()
+
+    while True:
+        await asyncio.sleep(check_interval)
+
+        try:
+            # Get all active sessions with their idle state
+            sessions = db.get_sessions()
+
+            for session in sessions:
+                session_id = session.get("id")
+                is_idle = session.get("is_idle", False)
+                status = session.get("status")
+
+                if not session_id or status != "active":
+                    continue
+
+                if is_idle and session_id not in known_idle:
+                    # Session just became idle - broadcast
+                    known_idle.add(session_id)
+                    asyncio.create_task(ws_manager.broadcast_lifecycle("session_idle", session))
+                elif not is_idle and session_id in known_idle:
+                    # Session is no longer idle - remove from tracking
+                    known_idle.discard(session_id)
+
+            # Clean up ended sessions from tracking
+            active_ids = {s["id"] for s in sessions if s.get("status") == "active"}
+            known_idle = known_idle & active_ids
+
+        except Exception as e:
+            logger.error("Idle detection error: %s", e, exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
     """Manage application lifecycle - startup and shutdown."""
@@ -99,19 +143,30 @@ async def lifespan(app: FastAPI) -> Any:
         )
     )
 
+    # Launch idle detection task in background
+    idle_task_handle = asyncio.create_task(
+        idle_detection_task(db=db, ws_manager=ws_manager, check_interval=30)
+    )
+
     # Store in app state for endpoint access
     app.state.config = config
     app.state.db = db
     app.state.ws_manager = ws_manager
     app.state.cleanup_task = cleanup_task_handle
+    app.state.idle_task = idle_task_handle
 
     yield  # Application runs here
 
     # SHUTDOWN PHASE
-    # Cancel cleanup task gracefully
+    # Cancel background tasks gracefully
     cleanup_task_handle.cancel()
+    idle_task_handle.cancel()
     try:
         await cleanup_task_handle
+    except asyncio.CancelledError:
+        pass  # Expected when cancelling
+    try:
+        await idle_task_handle
     except asyncio.CancelledError:
         pass  # Expected when cancelling
 
@@ -352,8 +407,20 @@ async def create_event(
             if not agent_id:
                 logger.warning("SubagentActivated missing agent_id")
 
+    # Detect idle→active transition before storing event
+    was_idle = False
+    if session_id:
+        session_before = db.get_session_by_id(session_id)
+        was_idle = session_before.get("is_idle", False) if session_before else False
+
     # Store event in database
     event_id = db.store_event(event_dict)
+
+    # Broadcast idle→active transition if session woke up
+    if was_idle and session_id:
+        session_after = db.get_session_by_id(session_id)
+        if session_after and not session_after.get("is_idle", False):
+            asyncio.create_task(ws_manager.broadcast_lifecycle("session_active", session_after))
 
     # Broadcast event to WebSocket clients (non-blocking)
     # Construct complete event dict with ID for broadcast

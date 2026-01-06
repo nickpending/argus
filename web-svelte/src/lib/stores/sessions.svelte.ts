@@ -328,6 +328,20 @@ function handleSessionEnded(message: ServerMessage): void {
   }
 }
 
+function handleSessionActive(message: ServerMessage): void {
+  const session = message.payload as { id: string; is_idle?: boolean };
+  if (session) {
+    updateSession(session.id, { is_idle: false });
+  }
+}
+
+function handleSessionIdle(message: ServerMessage): void {
+  const session = message.payload as { id: string; is_idle?: boolean };
+  if (session) {
+    updateSession(session.id, { is_idle: true });
+  }
+}
+
 function handleAgentStarted(message: ServerMessage): void {
   const agent = message.payload as Agent;
   if (agent) {
@@ -370,6 +384,8 @@ function initializeHandlers(): () => void {
   const unsubscribes = [
     websocket.onMessage("session_started", handleSessionStarted),
     websocket.onMessage("session_ended", handleSessionEnded),
+    websocket.onMessage("session_active", handleSessionActive),
+    websocket.onMessage("session_idle", handleSessionIdle),
     websocket.onMessage("agent_started", handleAgentStarted),
     websocket.onMessage("agent_activated", handleAgentActivated),
     websocket.onMessage("agent_completed", handleAgentCompleted),

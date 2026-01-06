@@ -15,6 +15,8 @@ export type ServerMessageType =
   | "event"
   | "session_started"
   | "session_ended"
+  | "session_active"
+  | "session_idle"
   | "agent_started"
   | "agent_activated"
   | "agent_completed"
