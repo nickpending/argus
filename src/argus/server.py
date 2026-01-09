@@ -292,6 +292,10 @@ async def create_event(
                     asyncio.create_task(
                         ws_manager.broadcast_lifecycle("session_ended", session_data)
                     )
+                # Abandon any agents that never completed
+                abandoned_agents = db.abandon_session_agents(session_id)
+                for agent in abandoned_agents:
+                    asyncio.create_task(ws_manager.broadcast_lifecycle("agent_abandoned", agent))
             else:
                 logger.warning(f"SessionEnd for unknown session: {session_id}")
         else:
@@ -643,6 +647,11 @@ async def close_session(
     session_data = db.get_session_by_id(session_id)
     if session_data:
         asyncio.create_task(ws_manager.broadcast_lifecycle("session_ended", session_data))
+
+    # Abandon any agents that never completed
+    abandoned_agents = db.abandon_session_agents(session_id)
+    for agent in abandoned_agents:
+        asyncio.create_task(ws_manager.broadcast_lifecycle("agent_abandoned", agent))
 
     return session_data
 

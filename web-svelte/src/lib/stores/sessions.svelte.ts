@@ -24,7 +24,7 @@ export interface Agent {
   parent_agent_id?: string;
   name?: string;
   type?: string;
-  status: "running" | "completed" | "failed";
+  status: "pending" | "running" | "completed" | "failed" | "abandoned";
   event_count: number;
   created_at: string;
   completed_at?: string;
@@ -241,7 +241,7 @@ interface AgentResponse {
   parent_agent_id?: string;
   name?: string;
   type?: string;
-  status: "running" | "completed" | "failed";
+  status: "pending" | "running" | "completed" | "failed" | "abandoned";
   event_count: number;
   created_at: string;
   completed_at?: string;
@@ -389,6 +389,7 @@ function initializeHandlers(): () => void {
     websocket.onMessage("agent_started", handleAgentStarted),
     websocket.onMessage("agent_activated", handleAgentActivated),
     websocket.onMessage("agent_completed", handleAgentCompleted),
+    websocket.onMessage("agent_abandoned", handleAgentCompleted), // Same handler, status comes from payload
   ];
   console.log(
     "[sessions] Registered WebSocket handlers for session/agent messages",

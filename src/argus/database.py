@@ -757,6 +757,63 @@ class Database:
         self.conn.commit()
         return cursor.rowcount > 0
 
+    def abandon_session_agents(self, session_id: str) -> list[dict[str, Any]]:
+        """Mark all non-completed agents in a session as abandoned.
+
+        Called when a session ends to clean up any agents that never received
+        completion events (e.g., user cancelled, session timed out).
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            List of abandoned agent dicts for broadcasting lifecycle events
+        """
+        completed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+        # Find agents to abandon
+        cursor = self.conn.execute(
+            """
+            SELECT id, tool_use_id, type, name, session_id, parent_agent_id, status,
+                   created_at, completed_at, event_count
+            FROM agents
+            WHERE session_id = ? AND status != 'completed'
+            """,
+            (session_id,),
+        )
+        rows = cursor.fetchall()
+
+        if not rows:
+            return []
+
+        # Mark them as abandoned
+        self.conn.execute(
+            """
+            UPDATE agents
+            SET status = 'abandoned', completed_at = ?
+            WHERE session_id = ? AND status != 'completed'
+            """,
+            (completed_at, session_id),
+        )
+        self.conn.commit()
+
+        # Return agent dicts for broadcasting
+        return [
+            {
+                "id": row[0],
+                "tool_use_id": row[1],
+                "type": row[2],
+                "name": row[3],
+                "session_id": row[4],
+                "parent_agent_id": row[5],
+                "status": "abandoned",
+                "created_at": row[7],
+                "completed_at": completed_at,
+                "event_count": row[9],
+            }
+            for row in rows
+        ]
+
     def cleanup_old_events(self, retention_days: int, vacuum: bool = False) -> int:
         """Delete events older than retention threshold.
 

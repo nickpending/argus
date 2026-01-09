@@ -20,6 +20,7 @@ export type ServerMessageType =
   | "agent_started"
   | "agent_activated"
   | "agent_completed"
+  | "agent_abandoned"
   | "error"
   | "pong";
 

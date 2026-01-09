@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Layers } from 'lucide-svelte';
 
-  type Status = 'started' | 'completed' | 'failed' | 'background' | 'pending' | 'activated';
+  type Status = 'started' | 'completed' | 'failed' | 'background' | 'pending' | 'activated' | 'abandoned';
 
   interface Props {
     status: Status | string;
@@ -10,7 +10,7 @@
 
   let { status, showBackground = false }: Props = $props();
 
-  const validStatuses = ['started', 'completed', 'failed', 'background', 'pending', 'activated'] as const;
+  const validStatuses = ['started', 'completed', 'failed', 'background', 'pending', 'activated', 'abandoned'] as const;
 
   function getStatusClass(s: string): string {
     return validStatuses.includes(s as Status) ? s : 'unknown';
@@ -60,6 +60,11 @@
   .status-badge.activated {
     background: var(--vw-cyan-bg);
     color: var(--vw-cyan);
+  }
+
+  .status-badge.abandoned {
+    background: var(--vw-warning-bg);
+    color: var(--vw-warning);
   }
 
   .status-badge.unknown {
