@@ -222,7 +222,6 @@ class Database:
         self,
         source: str | None = None,
         event_type: str | None = None,
-        level: str | None = None,
         since: str | None = None,
         until: str | None = None,
         limit: int = 100,
@@ -231,13 +230,13 @@ class Database:
         tool_name: str | None = None,
         status: str | None = None,
         agent_id: str | None = None,
+        tool_use_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Query events with optional filtering.
 
         Args:
             source: Filter by source
             event_type: Filter by event type
-            level: Filter by level
             since: Filter events after this timestamp (ISO8601)
             until: Filter events before this timestamp (ISO8601)
             limit: Maximum number of events to return (default 100)
@@ -246,6 +245,7 @@ class Database:
             tool_name: Filter by tool name
             status: Filter by status (success/failure/pending)
             agent_id: Filter by agent ID
+            tool_use_id: Filter by tool use ID
 
         Returns:
             List of event dictionaries with deserialized data
@@ -260,9 +260,6 @@ class Database:
         if event_type is not None:
             where_clauses.append("event_type = ?")
             params.append(event_type)
-        if level is not None:
-            where_clauses.append("level = ?")
-            params.append(level)
         if since is not None:
             where_clauses.append("timestamp >= ?")
             params.append(since)
@@ -284,6 +281,9 @@ class Database:
         if agent_id is not None:
             where_clauses.append("agent_id = ?")
             params.append(agent_id)
+        if tool_use_id is not None:
+            where_clauses.append("tool_use_id = ?")
+            params.append(tool_use_id)
 
         # Build query with parameterized values only
         base_query = (
@@ -693,6 +693,93 @@ class Database:
         )
         self.conn.commit()
         return cursor.rowcount > 0
+
+    def get_most_recent_pending_agent(self, session_id: str) -> dict[str, Any] | None:
+        """Get the most recent pending agent in a session.
+
+        Used by SubagentStart to find the pending agent created by PreToolUse,
+        since SubagentStart doesn't have tool_use_id for direct correlation.
+
+        Args:
+            session_id: Session identifier
+
+        Returns:
+            Agent dict with tool_use_id or None if no pending agent found
+        """
+        cursor = self.conn.execute(
+            """
+            SELECT id, tool_use_id, type, name, session_id, parent_agent_id, status,
+                   created_at, completed_at, event_count
+            FROM agents
+            WHERE session_id = ? AND status = 'pending'
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (session_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        return {
+            "id": row[0],
+            "tool_use_id": row[1],
+            "type": row[2],
+            "name": row[3],
+            "session_id": row[4],
+            "parent_agent_id": row[5],
+            "status": row[6],
+            "created_at": row[7],
+            "completed_at": row[8],
+            "event_count": row[9],
+        }
+
+    def update_agent_type(self, agent_id: str, agent_type: str) -> bool:
+        """Update agent type.
+
+        Used by SubagentStart to set the correct agent type from Claude Code payload,
+        since PreToolUse may not have the accurate type.
+
+        Args:
+            agent_id: Agent identifier
+            agent_type: New agent type
+
+        Returns:
+            True if agent was updated, False if not found
+        """
+        cursor = self.conn.execute(
+            """
+            UPDATE agents
+            SET type = ?
+            WHERE id = ?
+            """,
+            (agent_type, agent_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def correlate_pending_event(self, tool_use_id: str, agent_id: str) -> int:
+        """Set agent_id on pending event when SubagentStart provides it.
+
+        Called immediately when SubagentStart fires. The PreToolUse event has
+        tool_use_id but no agent_id — this correlates them in real-time.
+
+        Args:
+            tool_use_id: Tool use ID from the pending agent
+            agent_id: Real agent ID from SubagentStart
+
+        Returns:
+            Number of events updated
+        """
+        cursor = self.conn.execute(
+            """
+            UPDATE events
+            SET agent_id = ?
+            WHERE tool_use_id = ? AND agent_id IS NULL
+            """,
+            (agent_id, tool_use_id),
+        )
+        self.conn.commit()
+        return cursor.rowcount
 
     def get_agent_by_tool_use_id(self, tool_use_id: str) -> dict[str, Any] | None:
         """Get agent by tool_use_id (for pending agents before real agent_id is set).

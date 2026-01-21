@@ -176,7 +176,6 @@ class Event(BaseModel):
     event_type: str = Field(..., description="Event category")
     timestamp: str = Field(..., description="ISO8601 timestamp (UTC with Z suffix)")
     message: str | None = Field(default=None, description="Human-readable description")
-    level: str | None = Field(default=None, description="Log level")
     data: dict[str, Any] | None = Field(default=None, description="Arbitrary JSON data")
 
 
@@ -231,7 +230,6 @@ class EventResponse(BaseModel):
     event_type: str = Field(..., description="Event type")
     timestamp: str = Field(..., description="ISO8601 timestamp")
     message: str | None = Field(None, description="Event message")
-    level: str | None = Field(None, description="Log level")
     data: dict[str, Any] | None = Field(None, description="Additional event data")
     created_at: str = Field(..., description="Database creation timestamp")
     session_id: str | None = Field(None, description="Session ID")

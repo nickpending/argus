@@ -355,23 +355,50 @@ async def create_event(
             if not agent_id:
                 logger.warning("Agent PostToolUse event missing agent_id, skipping agent update")
 
-    # Legacy SubagentStart/SubagentStop handlers (keep for backwards compatibility)
+    # SubagentStart: activation signal from Claude Code
+    # When PreToolUse/PostToolUse flow is active, pending agent already exists
+    # Find it and activate with real agent_id
     elif hook == "SubagentStart":
         if agent_id and session_id:
             data = event_dict.get("data") or {}
-            agent_type = data.get("type", "subagent")
-            name = data.get("name")
-            parent_agent_id = data.get("parent_agent_id")
-            db.create_agent(agent_id, session_id, agent_type, name, parent_agent_id)
-            # Broadcast agent lifecycle to UI
-            agent_data = db.get_agent_by_id(agent_id)
-            if agent_data:
-                asyncio.create_task(ws_manager.broadcast_lifecycle("agent_started", agent_data))
+            agent_type = data.get("subagent_type") or data.get("type", "subagent")
+
+            # Find pending agent in this session (SubagentStart lacks tool_use_id)
+            pending = db.get_most_recent_pending_agent(session_id)
+            if pending:
+                tool_use_id = pending["tool_use_id"]
+                # Activate pending agent with real agent_id
+                if db.activate_pending_agent(tool_use_id, agent_id):
+                    db.update_agent_type(agent_id, agent_type)
+                    # Correlate pending event so it shows in agent view
+                    db.correlate_pending_event(tool_use_id, agent_id)
+                    # Broadcast updated pending event so UI can update it
+                    pending_events = db.query_events(tool_use_id=tool_use_id, limit=1)
+                    if pending_events:
+                        asyncio.create_task(ws_manager.broadcast(pending_events[0]))
+                    # Broadcast agent activation
+                    agent_data = db.get_agent_by_id(agent_id)
+                    if agent_data:
+                        agent_data["old_id"] = tool_use_id
+                        asyncio.create_task(
+                            ws_manager.broadcast_lifecycle("agent_activated", agent_data)
+                        )
+                    logger.info(
+                        f"SubagentStart activated: {tool_use_id} -> {agent_id} ({agent_type})"
+                    )
+            else:
+                # No pending agent - legacy flow without PreToolUse, create directly
+                name = data.get("name")
+                parent_agent_id = data.get("parent_agent_id")
+                db.create_agent(agent_id, session_id, agent_type, name, parent_agent_id)
+                agent_data = db.get_agent_by_id(agent_id)
+                if agent_data:
+                    asyncio.create_task(ws_manager.broadcast_lifecycle("agent_started", agent_data))
         else:
             if not agent_id:
-                logger.warning("SubagentStart event missing agent_id, skipping agent creation")
+                logger.warning("SubagentStart event missing agent_id, skipping")
             if not session_id:
-                logger.warning("SubagentStart event missing session_id, skipping agent creation")
+                logger.warning("SubagentStart event missing session_id, skipping")
 
     elif hook == "SubagentStop":
         if agent_id:
@@ -458,7 +485,6 @@ async def query_events(
     _api_key: str | None = Depends(verify_optional_api_key),
     source: str | None = None,
     event_type: str | None = None,
-    level: str | None = None,
     since: str | None = None,
     until: str | None = None,
     limit: int = 100,
@@ -475,7 +501,6 @@ async def query_events(
         _api_key: Validated API key or None (via dependency)
         source: Filter by source
         event_type: Filter by event type
-        level: Filter by level
         since: Filter events after this timestamp (ISO8601)
         until: Filter events before this timestamp (ISO8601)
         limit: Maximum number of events to return (default 100, max 1000)
@@ -503,7 +528,6 @@ async def query_events(
     events = db.query_events(
         source=source,
         event_type=event_type,
-        level=level,
         since=since,
         until=until,
         limit=limit,
@@ -766,7 +790,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 # Mount static files for web UI (serves at /)
 # Note: Must be mounted AFTER API routes to avoid shadowing /events endpoint
 # Try development location first, then installed location
-web_dir = Path(__file__).parent.parent.parent / "web"
+web_dir = Path(__file__).parent.parent.parent / "web" / "dist"
 if not web_dir.exists():
     # Try installed location (sys.prefix/share/argus/web)
     import sys

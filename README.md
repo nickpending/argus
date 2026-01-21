@@ -22,15 +22,31 @@ Think of it as having a single pane of glass for all your local development tool
 
 ## ✨ Features
 
+### Core Observability
 - 🔄 **Synchronous Event Capture** - POST blocks until event stored (solves async batching problem)
 - ⚡ **Real-Time Streaming** - WebSocket broadcasting with subscription filters
 - 💾 **SQLite Storage** - WAL mode for concurrent access, indexed queries
-- 🔍 **Query API** - Programmatic filtering by source, event type, level, time range
-- 🎨 **Cyberpunk Web UI** - Dark theme with real-time event visualization
+- 🔍 **Query API** - Programmatic filtering by source, event type, time range
 - 🔐 **API Key Authentication** - Simple bearer token auth for all endpoints
-- 📊 **Discovery Endpoints** - Auto-detect available sources and event types
+
+### Session & Agent Tracking
+- 📍 **Session Lifecycle** - Track active/idle/ended sessions across tools
+- ⏰ **Idle Detection** - Sessions marked idle after 10+ minutes of inactivity
+- 🤖 **Agent Swimlanes** - Visualize subagent activity with lifecycle tracking
+- 🔄 **Agent Status Transitions** - pending → running → completed/abandoned
+
+### Dashboard (Svelte 5)
+- 🎨 **Voidwire Aesthetic** - Dark theme with muted semantic colors
+- 📊 **Event Density Timeline** - Canvas-based visualization with type-colored waves
+- 🏊 **Agent Swimlanes** - Real-time subagent activity visualization
+- 🌳 **Session Tree** - Hierarchical view of sessions and agents
+- 🔧 **Filter Bar** - Source, event type, and time range filtering
+- ✨ **Status Badges** - Visual indicators for event/agent status
+
+### Operations
 - 🗑️ **Automatic Retention** - Configurable cleanup job with VACUUM support
 - 🛠️ **CLI Tools** - Serve, query, config, and status commands
+- 🚀 **Auto-Start** - launchd (macOS) and systemd (Linux) service templates
 
 ## 🎬 Quick Start
 
@@ -61,7 +77,6 @@ curl -X POST http://127.0.0.1:8765/events \
     "source": "my-app",
     "event_type": "startup",
     "message": "Application started",
-    "level": "info",
     "data": {"version": "1.0.0"}
   }'
 
@@ -82,12 +97,18 @@ That's it! You're observing events.
 
 ```json
 {
-  "source": "string",       // Required: Service name (e.g., "sable", "prismis")
-  "event_type": "string",   // Required: Event type (e.g., "thinking", "error")
+  "source": "string",       // Required: Service name (e.g., "sable", "momentum")
+  "event_type": "string",   // Required: tool, session, agent, response, prompt, command, skill
   "message": "string",      // Optional: Human-readable message
-  "level": "string",        // Optional: "debug", "info", "warn", "error"
   "timestamp": "string",    // Optional: ISO8601 with Z (server generates if missing)
-  "data": {}                // Optional: Arbitrary JSON data
+  "data": {},               // Optional: Arbitrary JSON data
+
+  // Agent observability fields (all optional)
+  "session_id": "string",   // Claude Code session identifier
+  "agent_id": "string",     // Links event to agent instance
+  "hook": "string",         // Hook that fired (PreToolUse, PostToolUse, SubagentStart, etc.)
+  "tool_name": "string",    // Tool invoked (Bash, Read, Edit, etc.)
+  "status": "string"        // Event outcome (success, failure, pending, activated)
 }
 ```
 
@@ -112,7 +133,7 @@ class ArgusClient:
         self.api_key = api_key
         self.client = httpx.Client()
 
-    def post_event(self, source, event_type, message=None, level=None, data=None):
+    def post_event(self, source, event_type, message=None, data=None):
         """Post event to Argus - blocks until captured."""
         event = {
             "source": source,
@@ -122,8 +143,6 @@ class ArgusClient:
 
         if message:
             event["message"] = message
-        if level:
-            event["level"] = level
         if data:
             event["data"] = data
 
@@ -142,9 +161,25 @@ event_id = argus.post_event(
     source="sable",
     event_type="thinking",
     message="Analyzing user request",
-    level="debug",
     data={"tokens": 1234, "duration_ms": 567}
 )
+```
+
+### CLI Integration (argus-send)
+
+For shell scripts and command-line workflows, use `argus-send` from [llmcli-tools](https://www.npmjs.com/package/@voidwire/argus-send):
+
+```bash
+# Install globally
+npm install -g @voidwire/argus-send
+
+# Or run directly with npx
+npx @voidwire/argus-send --source "backup-script" --type "session" --message "Backup started"
+
+# With data payload
+argus-send --source "deploy" --type "tool" \
+  --message "Deployed to production" \
+  --data '{"version": "1.2.3", "environment": "prod"}'
 ```
 
 ### JavaScript Integration
@@ -156,7 +191,7 @@ class ArgusClient {
     this.apiKey = apiKey;
   }
 
-  async postEvent(source, eventType, { message, level, data } = {}) {
+  async postEvent(source, eventType, { message, data } = {}) {
     const event = {
       source,
       event_type: eventType,
@@ -164,7 +199,6 @@ class ArgusClient {
     };
 
     if (message) event.message = message;
-    if (level) event.level = level;
     if (data) event.data = data;
 
     const response = await fetch(`${this.host}/events`, {
@@ -189,7 +223,6 @@ class ArgusClient {
 const argus = new ArgusClient("http://127.0.0.1:8765", "your-api-key");
 const eventId = await argus.postEvent("prismis", "article_saved", {
   message: "Article saved to database",
-  level: "info",
   data: { article_id: "abc123", priority: "high" }
 });
 ```
@@ -213,7 +246,7 @@ Producer (Sable/Prismis)
         │                                              │
         │                                              ├─► Broadcast to WebSocket clients
         │                                              │         │
-WebSocket Client ◄─── Filter by source/type/level ◄───┘         │
+WebSocket Client ◄─── Filter by source/type ◄─────────┘         │
         │                                                        │
     Web UI ◄─────────────────────────────────────────────────────┘
         │
@@ -231,9 +264,9 @@ WebSocket Client ◄─── Filter by source/type/level ◄───┘       
 ### Components
 
 - **FastAPI Server** - Single monolithic application for tight integration
-- **SQLite WAL** - Concurrent reads during writes, indexed on source/event_type/timestamp/level
+- **SQLite WAL** - Concurrent reads during writes, indexed on source/event_type/timestamp
 - **WebSocket Manager** - Maintains client connections with subscription filters
-- **Web UI** - Vanilla JS with cyberpunk aesthetic, client-side filtering
+- **Web UI** - Svelte 5 dashboard with Voidwire aesthetic
 - **CLI** - Server control, config management, query interface
 
 ## 🔧 Installation
@@ -290,13 +323,6 @@ days = 30                    # Keep events for 30 days
 cleanup_time = "03:00"       # Daily cleanup at 3 AM
 vacuum_after_cleanup = true  # Reclaim disk space
 
-[limits]
-max_payload_size_kb = 512
-max_query_limit = 1000
-
-[web_ui]
-title = "Argus Observability"
-
 [logging]
 level = "info"
 ```
@@ -335,7 +361,7 @@ launchctl start info.voidwire.argus
 launchctl unload ~/Library/LaunchAgents/info.voidwire.argus.plist
 
 # View logs
-tail -f /tmp/argus.out.log /tmp/argus.err.log
+tail -f ~/.local/state/argus/argus.log ~/.local/state/argus/argus.err.log
 ```
 
 **Troubleshooting:**
@@ -422,7 +448,7 @@ argus serve --host 0.0.0.0 --port 9000
 ```bash
 # CLI queries
 argus query --source sable --limit 10
-argus query --event-type error --level error
+argus query --event-type error
 argus query --since 2025-11-20T00:00:00Z --json
 
 # HTTP API queries
@@ -458,8 +484,7 @@ ws.onmessage = (event) => {
       type: 'subscribe',
       filters: {
         source: 'sable',          // Optional: filter by source
-        event_type: 'thinking',   // Optional: filter by type
-        level: 'info'             // Optional: filter by level
+        event_type: 'thinking'    // Optional: filter by type
       }
     }));
   }
@@ -491,7 +516,6 @@ ws.onmessage = (event) => {
   "source": "sable",
   "event_type": "thinking",
   "message": "Processing request",
-  "level": "debug",
   "timestamp": "2025-11-20T12:34:56Z",
   "data": {}
 }}
@@ -501,6 +525,16 @@ ws.onmessage = (event) => {
 
 // Pong response
 {"type": "pong"}
+
+// Lifecycle broadcasts (session/agent state changes)
+{"type": "lifecycle", "event": "session_started", "data": {...}}
+{"type": "lifecycle", "event": "session_idle", "data": {...}}
+{"type": "lifecycle", "event": "session_active", "data": {...}}
+{"type": "lifecycle", "event": "session_ended", "data": {...}}
+{"type": "lifecycle", "event": "agent_started", "data": {...}}
+{"type": "lifecycle", "event": "agent_activated", "data": {...}}
+{"type": "lifecycle", "event": "agent_completed", "data": {...}}
+{"type": "lifecycle", "event": "agent_abandoned", "data": {...}}
 ```
 
 ### Server Status
@@ -531,7 +565,6 @@ Capture event synchronously (blocks until stored).
   "source": "string",       // Required
   "event_type": "string",   // Required
   "message": "string",      // Optional
-  "level": "string",        // Optional: debug, info, warn, error
   "timestamp": "string",    // Optional: ISO8601 with Z
   "data": {}                // Optional: JSON object
 }
@@ -560,7 +593,6 @@ Query historical events with filtering.
 **Query Parameters:**
 - `source` - Filter by source (exact match)
 - `event_type` - Filter by event type (exact match)
-- `level` - Filter by level (exact match)
 - `since` - ISO8601 timestamp (events after this time)
 - `until` - ISO8601 timestamp (events before this time)
 - `limit` - Max results (default: 100, max: 1000)
@@ -574,7 +606,6 @@ Query historical events with filtering.
       "source": "sable",
       "event_type": "thinking",
       "message": "Processing request",
-      "level": "debug",
       "timestamp": "2025-11-20T12:34:56Z",
       "data": {}
     }
@@ -609,6 +640,78 @@ List all unique event types in database.
   "event_types": ["thinking", "error", "startup", "shutdown"]
 }
 ```
+
+### GET /sessions
+
+List sessions with agent counts and idle status.
+
+**Headers:**
+- `X-API-Key: string` (optional for web UI)
+
+**Response:** `200 OK`
+```json
+{
+  "sessions": [
+    {
+      "id": "session-abc123",
+      "project": "/Users/rudy/projects/argus",
+      "started_at": "2025-11-20T12:00:00Z",
+      "ended_at": null,
+      "status": "active",
+      "is_idle": false,
+      "agent_count": 3
+    }
+  ]
+}
+```
+
+### GET /agents
+
+List agents, optionally filtered by session.
+
+**Headers:**
+- `X-API-Key: string` (optional for web UI)
+
+**Query Parameters:**
+- `session_id` - Filter by session ID (optional)
+
+**Response:** `200 OK`
+```json
+{
+  "agents": [
+    {
+      "id": "agent-xyz789",
+      "session_id": "session-abc123",
+      "agent_type": "worker",
+      "name": "Fix authentication bug",
+      "status": "completed",
+      "started_at": "2025-11-20T12:05:00Z",
+      "completed_at": "2025-11-20T12:10:00Z",
+      "parent_agent_id": null
+    }
+  ]
+}
+```
+
+### PATCH /sessions/{session_id}
+
+Manually close a session (marks as ended, abandons incomplete agents).
+
+**Headers:**
+- `X-API-Key: string` (required)
+
+**Response:** `200 OK`
+```json
+{
+  "id": "session-abc123",
+  "status": "ended",
+  "ended_at": "2025-11-20T14:00:00Z"
+}
+```
+
+**Errors:**
+- `401` - Missing or invalid API key
+- `404` - Session not found
 
 ### WebSocket /ws
 
@@ -651,21 +754,20 @@ uv run mypy src/argus
 
 ```
 argus/
-├── src/argus/           # Python source
+├── src/argus/           # Python backend
 │   ├── cli.py           # CLI commands (serve, query, config, status)
 │   ├── server.py        # FastAPI application
 │   ├── database.py      # SQLite layer with WAL mode
 │   ├── websocket.py     # WebSocket manager
 │   ├── config.py        # Configuration loading
 │   └── models.py        # Pydantic models
-├── web/                 # Web UI (vanilla JS)
-│   ├── index.html       # HTML structure
-│   ├── styles.css       # Cyberpunk theme
-│   └── app.js           # WebSocket client, event rendering
+├── web/                 # Svelte 5 dashboard
+│   ├── src/             # Svelte source
+│   └── dist/            # Production build (served by FastAPI)
 ├── tests/               # Pytest suite
 │   ├── unit/            # Unit tests
 │   └── integration/     # Integration tests
-├── .workflow/           # Momentum workflow artifacts
+├── install/             # Service templates (launchd, systemd)
 └── pyproject.toml       # uv configuration
 ```
 
@@ -675,7 +777,7 @@ argus/
 
 - **WAL Mode** - Concurrent reads during writes (critical for real-time queries)
 - **Local-First** - No network database complexity for local dev tools
-- **Indexed Queries** - Fast filtering on source/event_type/timestamp/level
+- **Indexed Queries** - Fast filtering on source/event_type/timestamp
 - **Durability** - ACID guarantees with synchronous POST
 - **Simplicity** - Single file, no separate database process
 

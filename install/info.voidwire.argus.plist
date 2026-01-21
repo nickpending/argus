@@ -16,7 +16,7 @@
     - Stop:    launchctl stop info.voidwire.argus
     - Unload:  launchctl unload ~/Library/LaunchAgents/info.voidwire.argus.plist
     - Status:  launchctl list | grep argus
-    - Logs:    tail -f /tmp/argus.out.log /tmp/argus.err.log
+    - Logs:    tail -f ~/.local/state/argus/argus.log ~/.local/state/argus/argus.err.log
 -->
 <plist version="1.0">
 <dict>
@@ -43,12 +43,12 @@
     <key>KeepAlive</key>
     <true/>
 
-    <!-- Log stdout and stderr for debugging -->
+    <!-- Log stdout and stderr (XDG_STATE_HOME) -->
     <key>StandardOutPath</key>
-    <string>/tmp/argus.out.log</string>
+    <string>/Users/USERNAME/.local/state/argus/argus.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/tmp/argus.err.log</string>
+    <string>/Users/USERNAME/.local/state/argus/argus.err.log</string>
 
     <!-- Environment variables (optional, uncomment if needed) -->
     <!--

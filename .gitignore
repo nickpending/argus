@@ -87,6 +87,7 @@ docs/
 # Workspace protection
 .claude/
 .claudex/
+CLAUDE.md
 
 # Playwright MCP
 .playwright-mcp/

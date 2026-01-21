@@ -69,7 +69,6 @@ def serve(config: Path | None, host: str | None, port: int | None) -> None:
 )
 @click.option("--source", type=str, default=None, help="Filter by event source")
 @click.option("--event-type", type=str, default=None, help="Filter by event type")
-@click.option("--level", type=str, default=None, help="Filter by level (debug/info/warn/error)")
 @click.option("--since", type=str, default=None, help="Filter events since timestamp (ISO8601)")
 @click.option("--until", type=str, default=None, help="Filter events until timestamp (ISO8601)")
 @click.option("--limit", type=int, default=100, help="Maximum number of events to return")
@@ -78,7 +77,6 @@ def query(
     config: Path | None,
     source: str | None,
     event_type: str | None,
-    level: str | None,
     since: str | None,
     until: str | None,
     limit: int,
@@ -97,8 +95,6 @@ def query(
         params["source"] = source
     if event_type is not None:
         params["event_type"] = event_type
-    if level is not None:
-        params["level"] = level
     if since is not None:
         params["since"] = since
     if until is not None:
@@ -135,16 +131,15 @@ def query(
         click.echo(json.dumps(events, indent=2))
     else:
         # Simple table format
-        click.echo(f"{'ID':<6} {'Time':<20} {'Source':<15} {'Type':<20} {'Level':<8} Message")
-        click.echo("-" * 100)
+        click.echo(f"{'ID':<6} {'Time':<20} {'Source':<15} {'Type':<20} Message")
+        click.echo("-" * 90)
         for event in events:
             event_id = str(event.get("id", ""))
             timestamp = event.get("timestamp", "")[:19]  # Truncate milliseconds
             src = event.get("source", "")[:15]
             evt_type = event.get("event_type", "")[:20]
-            lvl = event.get("level", "-")[:8]
             msg = event.get("message", "")[:40]
-            click.echo(f"{event_id:<6} {timestamp:<20} {src:<15} {evt_type:<20} {lvl:<8} {msg}")
+            click.echo(f"{event_id:<6} {timestamp:<20} {src:<15} {evt_type:<20} {msg}")
 
         click.echo(f"\nTotal: {len(events)} events")
 
@@ -212,23 +207,9 @@ cleanup_time = "03:00"
 # Run VACUUM after cleanup to reclaim disk space
 vacuum_after_cleanup = true
 
-[limits]
-# Maximum event size in KB
-max_event_size_kb = 512
-# Maximum events per batch POST
-max_batch_size = 100
-
-[web_ui]
-# Enable web UI serving
-enabled = true
-
 [logging]
 # Log level: debug, info, warn, error
 level = "info"
-# Log format: json, text
-format = "json"
-# Log output destination
-output = "stdout"
 """
 
     # Write config file

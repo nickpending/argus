@@ -27,7 +27,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../web",
+    outDir: "dist",
     emptyOutDir: true,
     sourcemap: true,
   },
