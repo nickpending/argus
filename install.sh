@@ -126,8 +126,9 @@ setup_service() {
         return
     fi
 
-    # Create data directory (required by service)
+    # Create data and state directories (required by service)
     mkdir -p "$HOME/.local/share/argus"
+    mkdir -p "$HOME/.local/state/argus"
 
     if [ "$OS" = "macos" ]; then
         setup_launchd
@@ -144,6 +145,9 @@ setup_launchd() {
     PLIST_PATH="$SERVICE_DIR/$SERVICE_FILE"
 
     mkdir -p "$SERVICE_DIR"
+
+    # Unload existing service if present (ignore errors if not loaded)
+    launchctl unload "$PLIST_PATH" 2>/dev/null || true
 
     # Download and configure plist
     curl -fsSL "$PLIST_URL" -o "$PLIST_PATH"
@@ -170,6 +174,9 @@ setup_systemd() {
     SERVICE_PATH="$SERVICE_DIR/$SERVICE_FILE"
 
     mkdir -p "$SERVICE_DIR"
+
+    # Stop existing service if running (ignore errors if not running)
+    systemctl --user stop argus 2>/dev/null || true
 
     # Download service file
     curl -fsSL "$SERVICE_URL" -o "$SERVICE_PATH"
